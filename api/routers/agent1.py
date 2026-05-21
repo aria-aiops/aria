@@ -10,7 +10,6 @@ import time
 from fastapi import APIRouter, HTTPException
 
 import core.config as cfg
-
 from api.dependencies import get_agent1
 from api.schemas import (
     Agent1Response,
@@ -59,6 +58,7 @@ def run_agent1(request: Agent1RunRequest) -> Agent1Response:
         )
 
     meta = result.incident_metadata
+    assert meta is not None
     llm_raw = meta.raw_record.get("_llm_extraction")
     llm_detail = LLMExtractionDetail(**llm_raw) if llm_raw else None
 

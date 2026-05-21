@@ -7,7 +7,7 @@ The `data` field is agent-specific and typed per router.
 """
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -19,8 +19,8 @@ class AgentResponse(BaseModel):
     agent: str
     incident_number: str
     duration_ms: int
-    data: Optional[Any] = None
-    error: Optional[str] = None
+    data: Any | None = None
+    error: str | None = None
 
 
 class ErrorResponse(BaseModel):
@@ -40,27 +40,27 @@ class Agent1RunRequest(BaseModel):
 
 
 class LLMExtractionDetail(BaseModel):
-    affected_ci: Optional[str]
+    affected_ci: str | None
     platform_tag: str
     confidence: str
 
 
 class IncidentData(BaseModel):
     incident_number: str
-    caller: Optional[str]
+    caller: str | None
     short_description: str
     long_description: str
     priority: str
     state: str
-    affected_ci: Optional[str]
-    assigned_group: Optional[str]
+    affected_ci: str | None
+    assigned_group: str | None
     opened_at: datetime
-    llm_extraction: Optional[LLMExtractionDetail] = None
+    llm_extraction: LLMExtractionDetail | None = None
 
 
 class Agent1Response(AgentResponse):
     agent: str = "agent1"
-    data: Optional[IncidentData] = None
+    data: IncidentData | None = None
 
 
 # ── Agent 1 health ─────────────────────────────────────────────────────────────
@@ -69,8 +69,8 @@ class Agent1Response(AgentResponse):
 class AgentHealthResponse(BaseModel):
     agent: str
     status: str  # "ready" | "degraded" | "unavailable"
-    llm_model: Optional[str] = None
-    connector: Optional[str] = None
+    llm_model: str | None = None
+    connector: str | None = None
 
 
 # ── Agent 2 ────────────────────────────────────────────────────────────────────
@@ -78,22 +78,22 @@ class AgentHealthResponse(BaseModel):
 
 class AffectedResourceInput(BaseModel):
     name: str
-    ip_address: Optional[str] = None
+    ip_address: str | None = None
 
 
 class Agent2MetadataInput(BaseModel):
     """Pre-fetched incident metadata for Agent 2 — skips calling Agent 1."""
 
-    affected_ci: Optional[str] = None
-    affected_ci_ip: Optional[str] = None
+    affected_ci: str | None = None
+    affected_ci_ip: str | None = None
     platform_tag: str = "unknown"
     opened_at: datetime
-    affected_resources: List[AffectedResourceInput] = []
+    affected_resources: list[AffectedResourceInput] = []
 
 
 class Agent2RunRequest(BaseModel):
     incident_number: str
-    metadata: Optional[Agent2MetadataInput] = None  # if None → Agent 1 called first
+    metadata: Agent2MetadataInput | None = None  # if None → Agent 1 called first
 
 
 class LogLineData(BaseModel):
@@ -110,8 +110,8 @@ class LogQueryPlanData(BaseModel):
     """
 
     connector_name: str
-    log_paths: List[str]
-    keywords: List[str]
+    log_paths: list[str]
+    keywords: list[str]
     time_window_minutes: int
     reasoning: str
 
@@ -120,13 +120,13 @@ class Agent2Data(BaseModel):
     query_executed: str
     total_scanned: int
     confidence: str  # "high" | "medium" | "low"
-    log_lines: List[LogLineData]
-    log_query_plan: Optional[LogQueryPlanData] = None
+    log_lines: list[LogLineData]
+    log_query_plan: LogQueryPlanData | None = None
 
 
 class Agent2Response(AgentResponse):
     agent: str = "agent2"
-    data: Optional[Agent2Data] = None
+    data: Agent2Data | None = None
 
 
 # ── Agent 4 ────────────────────────────────────────────────────────────────────
@@ -139,25 +139,25 @@ class Agent4ClassificationInput(BaseModel):
     error_label: str
     confidence: float
     confidence_band: str  # "high" | "medium" | "low"
-    supporting_evidence: List[str] = []
-    recommended_actions: List[str] = []
+    supporting_evidence: list[str] = []
+    recommended_actions: list[str] = []
 
 
 class Agent4RunRequest(BaseModel):
     incident_number: str
-    classification: Optional[Agent4ClassificationInput] = None
+    classification: Agent4ClassificationInput | None = None
 
 
 class Agent4Data(BaseModel):
     notification_sent: bool
     channel: str  # e.g. "slack"
-    message_id: Optional[str] = None
+    message_id: str | None = None
     is_partial: bool
 
 
 class Agent4Response(AgentResponse):
     agent: str = "agent4"
-    data: Optional[Agent4Data] = None
+    data: Agent4Data | None = None
 
 
 # ── Global health ──────────────────────────────────────────────────────────────
@@ -166,4 +166,4 @@ class Agent4Response(AgentResponse):
 class HealthResponse(BaseModel):
     status: str
     version: str
-    agents: Dict[str, str]
+    agents: dict[str, str]

@@ -28,7 +28,6 @@ ARI-13, ARI-14, ARI-74, ARI-75
 import json
 import logging
 from datetime import datetime, timedelta
-from typing import Optional
 
 from core.interfaces.knowledge_base import KnowledgeBaseInterface
 from core.interfaces.llm_client import LLMClientInterface
@@ -65,8 +64,8 @@ class LogExtractorAgent:
     def __init__(
         self,
         connector_registry: dict[PlatformTag, LogStoreInterface],
-        knowledge_base: Optional[KnowledgeBaseInterface] = None,
-        llm_client: Optional[LLMClientInterface] = None,
+        knowledge_base: KnowledgeBaseInterface | None = None,
+        llm_client: LLMClientInterface | None = None,
     ) -> None:
         self._registry = connector_registry
         self._kb = knowledge_base
@@ -92,7 +91,7 @@ class LogExtractorAgent:
             return state
 
         # Attempt LLM query planning when a client is injected (ARI-74/75)
-        plan: Optional[LogQueryPlan] = None
+        plan: LogQueryPlan | None = None
         if self._llm is not None:
             try:
                 plan = self._plan_with_llm(state)
@@ -134,6 +133,7 @@ class LogExtractorAgent:
         Raises on any error — callers catch and fall back to static routing.
         """
         meta = state.incident_metadata
+        assert meta is not None
         available = [tag.value for tag in self._registry]
 
         hint_text = ""
@@ -174,6 +174,7 @@ class LogExtractorAgent:
             "Choose the best connector and specify log paths, keywords, and time window."
         )
 
+        assert self._llm is not None
         response = self._llm.complete(
             messages=[{"role": "user", "content": user_content}],
             max_tokens=512,
@@ -194,7 +195,7 @@ class LogExtractorAgent:
         self,
         metadata: IncidentMetadata,
         ssh_host: str,
-        plan: Optional[LogQueryPlan] = None,
+        plan: LogQueryPlan | None = None,
     ) -> LogQueryResult:
         platform_tag = metadata.platform_tag or PlatformTag.UNKNOWN
         opened_at = metadata.opened_at
@@ -262,7 +263,7 @@ class LogExtractorAgent:
         self,
         metadata: IncidentMetadata,
         resources: list[AffectedResource],
-        plan: Optional[LogQueryPlan] = None,
+        plan: LogQueryPlan | None = None,
     ) -> LogQueryResult:
         """Query logs from each resource and merge results."""
         all_lines: list[LogLine] = []
@@ -276,7 +277,7 @@ class LogExtractorAgent:
             queries.append(result.query_executed)
             total_scanned += result.total_scanned
 
-        all_lines.sort(key=lambda l: l.timestamp)
+        all_lines.sort(key=lambda line: line.timestamp)
         confidence = (
             ConfidenceBand.HIGH
             if total_scanned >= 10

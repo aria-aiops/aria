@@ -3,12 +3,11 @@
 ARI-43 · ARI-44 · ARI-58
 """
 
-import os
 from datetime import datetime
 
 import pytest
 
-from core.exceptions import KnowledgeBaseError, VaultSecretNotFoundError
+from core.exceptions import VaultSecretNotFoundError
 from core.interfaces.knowledge_base import KnowledgeBaseInterface
 from core.interfaces.vault import VaultInterface
 from core.models import (
@@ -67,7 +66,7 @@ class TestIncidentMetadataExtensions:
             opened_at=datetime(2026, 4, 28, 10, 0, 0),
         )
         defaults.update(kwargs)
-        return IncidentMetadata(**defaults)
+        return IncidentMetadata(**defaults)  # type: ignore[arg-type]
 
     def test_defaults_to_no_ci_class(self):
         inc = self._make_incident()
@@ -151,4 +150,4 @@ class TestKnowledgeBaseInterfaceContract:
 
     def test_cannot_instantiate_abc(self):
         with pytest.raises(TypeError):
-            KnowledgeBaseInterface()  # type: ignore[abstract]
+            KnowledgeBaseInterface()

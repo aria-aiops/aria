@@ -198,7 +198,7 @@ def test_chain_path1_returns_hdfs_logs(agent1, agent2):
     assert state.error is None
     assert state.log_result is not None
     assert len(state.log_result.log_lines) > 0
-    msgs = " ".join(l.message for l in state.log_result.log_lines)
+    msgs = " ".join(line.message for line in state.log_result.log_lines)
     assert "DiskOutOfSpaceException" in msgs or "safe mode" in msgs.lower()
 
 

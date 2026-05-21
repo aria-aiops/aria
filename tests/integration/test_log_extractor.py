@@ -15,7 +15,6 @@ import json
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 import pytest
 
@@ -76,11 +75,11 @@ class FixtureLogConnector(LogStoreInterface):
         platform_tag: PlatformTag,
         start_time: datetime,
         end_time: datetime,
-        keywords: Optional[list[str]] = None,
-        log_paths: Optional[list[str]] = None,
+        keywords: list[str] | None = None,
+        log_paths: list[str] | None = None,
         max_results: int = 50,
     ) -> LogQueryResult:
-        filtered = [l for l in self._lines if start_time <= l.timestamp <= end_time]
+        filtered = [line for line in self._lines if start_time <= line.timestamp <= end_time]
         confidence = (
             ConfidenceBand.HIGH
             if len(filtered) >= 10
@@ -150,8 +149,10 @@ def test_cdp_yarn_returns_oom_errors():
 
     assert result_state.error is None
     log_lines = result_state.log_result.log_lines
-    assert any(l.level == "ERROR" for l in log_lines)
-    assert any("OutOfMemoryError" in l.message or "memory" in l.message.lower() for l in log_lines)
+    assert any(line.level == "ERROR" for line in log_lines)
+    assert any(
+        "OutOfMemoryError" in line.message or "memory" in line.message.lower() for line in log_lines
+    )
 
 
 def test_unknown_platform_returns_empty_without_crash():

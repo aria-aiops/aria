@@ -8,13 +8,11 @@ ARI-45
 
 import logging
 import os
-from typing import Optional
-
-import core.config as cfg
 
 import requests
 from requests.auth import HTTPBasicAuth
 
+import core.config as cfg
 from core.models import AffectedResource, CIClass
 
 logger = logging.getLogger(__name__)
@@ -70,7 +68,7 @@ class CMDBResolver:
             resp = requests.get(
                 f"{self._base}/cmdb_ci",
                 auth=self._auth,
-                params={
+                params={  # type: ignore[arg-type]
                     "sysparm_query": f"name={ci_name}",
                     "sysparm_fields": "name,sys_class_name",
                     "sysparm_limit": 1,
@@ -93,13 +91,13 @@ class CMDBResolver:
             logger.warning("CMDBResolver.get_ci_class failed for %r: %s", ci_name, exc)
             return CIClass.UNKNOWN
 
-    def get_ip(self, ci_name: str) -> Optional[str]:
+    def get_ip(self, ci_name: str) -> str | None:
         """Return the IP address of a named CI from CMDB. Returns None on miss or error."""
         try:
             resp = requests.get(
                 f"{self._base}/cmdb_ci",
                 auth=self._auth,
-                params={
+                params={  # type: ignore[arg-type]
                     "sysparm_query": f"name={ci_name}",
                     "sysparm_fields": "name,ip_address",
                     "sysparm_limit": 1,
@@ -116,13 +114,13 @@ class CMDBResolver:
             logger.warning("CMDBResolver.get_ip failed for %r: %s", ci_name, exc)
             return None
 
-    def get_parent_cluster(self, ci_name: str) -> Optional[str]:
+    def get_parent_cluster(self, ci_name: str) -> str | None:
         """Return the cluster that contains ci_name as a member. Returns None if not found."""
         try:
             resp = requests.get(
                 f"{self._base}/cmdb_rel_ci",
                 auth=self._auth,
-                params={
+                params={  # type: ignore[arg-type]
                     "sysparm_query": f"child.name={ci_name}^type.name={self._rel_type}",
                     "sysparm_fields": "parent",
                     "sysparm_display_value": "true",
@@ -148,7 +146,7 @@ class CMDBResolver:
             resp = requests.get(
                 f"{self._base}/cmdb_rel_ci",
                 auth=self._auth,
-                params={
+                params={  # type: ignore[arg-type]
                     "sysparm_query": (
                         f"parent.name={cluster_name}^child.name={ci_name}"
                         f"^type.name={self._rel_type}"
@@ -172,7 +170,7 @@ class CMDBResolver:
             resp = requests.get(
                 f"{self._base}/cmdb_rel_ci",
                 auth=self._auth,
-                params={
+                params={  # type: ignore[arg-type]
                     "sysparm_query": (f"parent.name={cluster_name}^type.name={self._rel_type}"),
                     "sysparm_fields": "child",
                     "sysparm_display_value": "true",

@@ -7,7 +7,6 @@ touching any agent code.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
 
 
 class LLMClientInterface(ABC):
@@ -20,10 +19,10 @@ class LLMClientInterface(ABC):
     @abstractmethod
     def complete(
         self,
-        messages: List[Dict[str, str]],
+        messages: list[dict[str, str]],
         max_tokens: int = 1024,
         temperature: float = 0.0,
-        system: Optional[str] = None,
+        system: str | None = None,
     ) -> str:
         """Send a list of messages to the LLM and return the response text.
 

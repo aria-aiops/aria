@@ -7,14 +7,14 @@ No network calls — safe to use in unit tests and dry-run mode.
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from core.exceptions import IncidentNotFoundError
 from core.interfaces.connector import ConnectorInterface
 from core.models import IncidentMetadata, Priority
 
 
-def _parse_incident(raw: Dict[str, Any]) -> IncidentMetadata:
+def _parse_incident(raw: dict[str, Any]) -> IncidentMetadata:
     """Parse a raw incident dict into IncidentMetadata.
 
     Handles missing optional fields gracefully rather than raising KeyError.
@@ -61,14 +61,14 @@ class InMemoryConnector(ConnectorInterface):
 
     def __init__(
         self,
-        incidents: Optional[List[Dict[str, Any]]] = None,
-        fixture_path: Optional[Path] = None,
+        incidents: list[dict[str, Any]] | None = None,
+        fixture_path: Path | None = None,
     ) -> None:
         if fixture_path is not None:
             with open(fixture_path) as f:
                 incidents = json.load(f)
         # Keyed by incident number for O(1) lookup
-        self._incidents: Dict[str, Dict[str, Any]] = {
+        self._incidents: dict[str, dict[str, Any]] = {
             inc["number"]: inc for inc in (incidents or [])
         }
 
@@ -89,7 +89,7 @@ class InMemoryConnector(ConnectorInterface):
             raise IncidentNotFoundError(f"Incident {incident_number} not found in fixture data")
         return _parse_incident(raw)
 
-    def list_recent_incidents(self, limit: int = 10) -> List[IncidentMetadata]:
+    def list_recent_incidents(self, limit: int = 10) -> list[IncidentMetadata]:
         """Return up to `limit` incidents ordered by opened_at descending.
 
         Args:

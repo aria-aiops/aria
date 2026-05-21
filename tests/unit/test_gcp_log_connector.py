@@ -4,7 +4,7 @@ google-cloud-logging is mocked — no real GCP credentials required.
 """
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -15,7 +15,6 @@ from implementations.clusters.cloud.gcp.log_connector import (
     GCPLogConnector,
     _build_filter,
     _entry_to_log_line,
-    _rfc3339,
 )
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────

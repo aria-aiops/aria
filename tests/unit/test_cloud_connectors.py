@@ -1,7 +1,6 @@
 """Unit tests for ARI-50/51/52 cloud log connectors — all mocked, no real cloud calls."""
 
 import gzip
-import json
 from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 
@@ -40,10 +39,10 @@ class TestAWSEMRLogConnector:
 
     def test_returns_parsed_log_lines(self):
         log_content = (
-            "2026-04-16 02:05:00,000 ERROR org.apache.hadoop.hdfs.server.namenode.FSNamesystem: "
-            "Disk quota exceeded\n"
-            "2026-04-16 02:06:00,000 WARN org.apache.hadoop.yarn.server: GC overhead\n"
-        ).encode()
+            b"2026-04-16 02:05:00,000 ERROR org.apache.hadoop.hdfs.server.namenode.FSNamesystem: "
+            b"Disk quota exceeded\n"
+            b"2026-04-16 02:06:00,000 WARN org.apache.hadoop.yarn.server: GC overhead\n"
+        )
 
         mock_s3 = MagicMock()
         mock_s3.get_paginator.return_value.paginate.return_value = [
@@ -129,9 +128,9 @@ class TestAWSEMRLogConnector:
 
     def test_keyword_filter_applied(self):
         log_content = (
-            "2026-04-16 02:05:00,000 ERROR Class: OutOfMemory error\n"
-            "2026-04-16 02:06:00,000 ERROR Class: Disk quota exceeded\n"
-        ).encode()
+            b"2026-04-16 02:05:00,000 ERROR Class: OutOfMemory error\n"
+            b"2026-04-16 02:06:00,000 ERROR Class: Disk quota exceeded\n"
+        )
         mock_s3 = MagicMock()
         mock_s3.get_paginator.return_value.paginate.return_value = [
             {
@@ -285,7 +284,6 @@ class TestDatabricksLogConnector:
         return resp
 
     def test_returns_error_events_as_log_lines(self):
-        from implementations.clusters.cloud.databricks.log_connector import DatabricksLogConnector
 
         connector = self._make()
         event = {
@@ -372,7 +370,6 @@ class TestChromaKnowledgeBase:
 
     def _make_mock_chroma(self, docs=None, distances=None, metadatas=None):
         """Return a mock chromadb module with a pre-configured collection."""
-        import sys
         from unittest.mock import MagicMock
 
         mock_chroma = MagicMock()

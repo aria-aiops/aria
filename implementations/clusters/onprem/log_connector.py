@@ -14,7 +14,6 @@ import logging
 import re
 import shlex
 from datetime import datetime
-from typing import Optional
 
 import paramiko
 
@@ -69,7 +68,7 @@ class SSHLogConnector(LogStoreInterface):
         default_keywords: list[str] | None = None,
         ssh_port: int = 22,
         timeout: int = 30,
-        host_key_secret: Optional[str] = None,
+        host_key_secret: str | None = None,
     ) -> None:
         self._vault = vault
         self._ssh_key_secret = ssh_key_secret
@@ -129,7 +128,9 @@ class SSHLogConnector(LogStoreInterface):
                 continue
             log_lines.append(ll)
 
-        log_lines.sort(key=lambda l: (_LEVEL_PRIORITY.get(l.level.upper(), 99), l.timestamp))
+        log_lines.sort(
+            key=lambda line: (_LEVEL_PRIORITY.get(line.level.upper(), 99), line.timestamp)
+        )
         total = len(log_lines)
         log_lines = log_lines[:max_results]
 
@@ -224,7 +225,7 @@ def _load_private_key(pem: str) -> paramiko.PKey:
     raise LogStoreUnavailableError("Cannot load SSH private key — unsupported key format")
 
 
-def _parse_line(raw: str, host: str) -> Optional[LogLine]:
+def _parse_line(raw: str, host: str) -> LogLine | None:
     m = _LOG_LINE_RE.match(raw.strip())
     if not m:
         return None

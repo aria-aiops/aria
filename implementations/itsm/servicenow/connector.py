@@ -14,13 +14,12 @@ Required env vars:
 import logging
 import os
 from datetime import datetime
-from typing import List, Optional
-
-import core.config as cfg
+from typing import Any
 
 import requests
 from requests.auth import HTTPBasicAuth
 
+import core.config as cfg
 from core.exceptions import ConnectorAuthError, ConnectorUnavailableError, IncidentNotFoundError
 from core.interfaces.connector import ConnectorInterface
 from core.models import IncidentMetadata, Priority
@@ -52,9 +51,15 @@ class ServiceNowConnector(ConnectorInterface):
         user = cfg.snow_user()
         password = os.environ.get("SNOW_PASSWORD", "")
         if not instance:
-            raise ValueError("ServiceNow instance is not configured (set servicenow.instance in conf.yaml)")
+            raise ValueError(
+                "ServiceNow instance is not configured "
+                "(set servicenow.instance in conf.yaml or SNOW_INSTANCE env var)"
+            )
         if not user:
-            raise ValueError("ServiceNow user is not configured (set servicenow.user in conf.yaml)")
+            raise ValueError(
+                "ServiceNow user is not configured "
+                "(set servicenow.user in conf.yaml or SNOW_USER env var)"
+            )
         if not password:
             raise ValueError("Required environment variable 'SNOW_PASSWORD' is not set")
         self._instance = instance
@@ -76,7 +81,7 @@ class ServiceNowConnector(ConnectorInterface):
             raise IncidentNotFoundError(f"Incident {incident_number} not found in ServiceNow")
         return self._parse(records[0])
 
-    def list_recent_incidents(self, limit: int = 10) -> List[IncidentMetadata]:
+    def list_recent_incidents(self, limit: int = 10) -> list[IncidentMetadata]:
         query = "state!=6^state!=7^ORDERBYDESCopened_at"
         if self._assignment_group:
             query = f"assignment_group.name={self._assignment_group}^{query}"
@@ -130,14 +135,14 @@ class ServiceNowConnector(ConnectorInterface):
         )
 
     @staticmethod
-    def _display(value) -> str:
+    def _display(value: Any) -> str:
         """Return the display_value from a sysparm_display_value=all field dict, or the raw string."""
         if isinstance(value, dict):
             return value.get("display_value") or ""
         return value or ""
 
     @staticmethod
-    def _raw_value(value) -> str:
+    def _raw_value(value: Any) -> str:
         """Return the raw UTC value from a sysparm_display_value=all field dict, or the string."""
         if isinstance(value, dict):
             return value.get("value") or ""

@@ -5,7 +5,7 @@ when the target Teams environment supports the Workflows connector.
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import requests
 
@@ -14,7 +14,7 @@ from core.models import ConfidenceBand, NotificationPayload
 
 logger = logging.getLogger(__name__)
 
-_CONFIDENCE_COLORS: Dict[Optional[ConfidenceBand], str] = {
+_CONFIDENCE_COLORS: dict[ConfidenceBand | None, str] = {
     ConfidenceBand.HIGH: "00b37a",  # green
     ConfidenceBand.MEDIUM: "daa038",  # amber
     ConfidenceBand.LOW: "de3c3c",  # red
@@ -22,11 +22,11 @@ _CONFIDENCE_COLORS: Dict[Optional[ConfidenceBand], str] = {
 }
 
 
-def _build_card(payload: NotificationPayload) -> Dict[str, Any]:
+def _build_card(payload: NotificationPayload) -> dict[str, Any]:
     color = _CONFIDENCE_COLORS.get(payload.confidence_band, "888888")
     title = f"ARIA Alert — {payload.incident_number} [{payload.priority}]"
 
-    facts: List[Dict[str, str]] = [
+    facts: list[dict[str, str]] = [
         {"name": "Platform", "value": payload.platform.upper()},
     ]
     if payload.affected_ci:
@@ -43,7 +43,7 @@ def _build_card(payload: NotificationPayload) -> Dict[str, Any]:
     if payload.log_summary:
         facts.append({"name": "Logs", "value": payload.log_summary})
 
-    sections: List[Dict[str, Any]] = [
+    sections: list[dict[str, Any]] = [
         {
             "activityTitle": payload.short_description,
             "facts": facts,

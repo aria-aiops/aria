@@ -15,9 +15,7 @@ import json
 import logging
 import re
 from datetime import datetime, timezone
-from typing import Optional
-
-_SAFE_HOST_RE = re.compile(r"^[A-Za-z0-9._\-]+$")
+from typing import Any
 
 from core.exceptions import LogStoreUnavailableError
 from core.interfaces.log_store import LogStoreInterface
@@ -25,6 +23,8 @@ from core.interfaces.vault import VaultInterface
 from core.models import ConfidenceBand, LogLine, LogQueryResult, PlatformTag
 
 logger = logging.getLogger(__name__)
+
+_SAFE_HOST_RE = re.compile(r"^[A-Za-z0-9._\-]+$")
 
 _SEVERITY_MAP: dict[str, str] = {
     "DEFAULT": "INFO",
@@ -53,7 +53,7 @@ class GCPLogConnector(LogStoreInterface):
         self,
         vault: VaultInterface,
         sa_key_secret: str = "GCP_SA_JSON",
-        project_id: Optional[str] = None,
+        project_id: str | None = None,
     ) -> None:
         self._vault = vault
         self._sa_key_secret = sa_key_secret
@@ -103,7 +103,9 @@ class GCPLogConnector(LogStoreInterface):
             )
 
         log_lines = [ll for e in entries if (ll := _entry_to_log_line(e, host)) is not None]
-        log_lines.sort(key=lambda l: (_LEVEL_PRIORITY.get(l.level.upper(), 99), l.timestamp))
+        log_lines.sort(
+            key=lambda line: (_LEVEL_PRIORITY.get(line.level.upper(), 99), line.timestamp)
+        )
         total = len(log_lines)
         log_lines = log_lines[:max_results]
 
@@ -123,7 +125,7 @@ class GCPLogConnector(LogStoreInterface):
 
     # ── Internal ─────────────────────────────────────────────────────────────
 
-    def _build_client(self, sa_json: str):
+    def _build_client(self, sa_json: str) -> tuple[Any, str]:
         from google.cloud import logging as gcp_logging  # noqa: PLC0415
         from google.oauth2 import service_account  # noqa: PLC0415
 
@@ -162,9 +164,7 @@ def _build_filter(
             f'resource.labels.job_id="{safe_host}")'
         )
     if keywords:
-        safe_kws = [
-            _escape_filter_string(k) for k in keywords[:10] if k and len(k) <= 100
-        ]
+        safe_kws = [_escape_filter_string(k) for k in keywords[:10] if k and len(k) <= 100]
         if safe_kws:
             kw_parts = " OR ".join(f'textPayload:"{k}"' for k in safe_kws)
             parts.append(f"({kw_parts})")
@@ -177,7 +177,7 @@ def _rfc3339(dt: datetime) -> str:
     return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _entry_to_log_line(entry, host: str) -> Optional[LogLine]:
+def _entry_to_log_line(entry: Any, host: str) -> LogLine | None:
     try:
         ts = getattr(entry, "timestamp", None)
         if ts is None:

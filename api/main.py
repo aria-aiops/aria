@@ -9,12 +9,12 @@ ReDoc available at:       http://localhost:8000/redoc
 
 import logging
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-logger = logging.getLogger(__name__)
-
 from api.routers import agent1, agent2, agent4, health
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="ARIA Agent API",
@@ -39,7 +39,7 @@ app.include_router(agent4.router, prefix="/api/v1")
 
 
 @app.exception_handler(Exception)
-async def global_exception_handler(request, exc):
+async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     logger.exception("Unhandled exception for %s %s", request.method, request.url)
     return JSONResponse(
         status_code=500,

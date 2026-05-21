@@ -9,7 +9,6 @@ the process environment injected by Infisical or a local .env file.
 import os
 from functools import lru_cache
 from pathlib import Path
-from typing import Optional
 
 
 @lru_cache(maxsize=1)
@@ -43,14 +42,18 @@ def _get(keys: list[str], env_fallback: str, default: str = "") -> str:
 
 # ── ServiceNow ────────────────────────────────────────────────────────────────
 
+
 def snow_instance() -> str:
     return _get(["servicenow", "instance"], "SNOW_INSTANCE")
+
 
 def snow_user() -> str:
     return _get(["servicenow", "user"], "SNOW_USER")
 
+
 def snow_assignment_group() -> str:
     return _get(["servicenow", "assignment_group"], "SNOW_ASSIGNMENT_GROUP")
+
 
 def snow_cmdb_rel_type() -> str:
     return _get(["servicenow", "cmdb_rel_type"], "SNOW_CMDB_REL_TYPE", "Members::Member of")
@@ -58,18 +61,22 @@ def snow_cmdb_rel_type() -> str:
 
 # ── LLM ───────────────────────────────────────────────────────────────────────
 
+
 def llm_mode() -> str:
     return _get(["llm", "mode"], "ARIA_LLM_MODE", "modular")
 
-def llm_global_model() -> Optional[str]:
+
+def llm_global_model() -> str | None:
     val = _get(["llm", "global_model"], "ARIA_GLOBAL_MODEL")
     return val or None
 
-def llm_agent_model(agent_num: str) -> Optional[str]:
+
+def llm_agent_model(agent_num: str) -> str | None:
     val = _get(["llm", "agents", f"agent{agent_num}"], f"ARIA_AGENT{agent_num}_MODEL")
     return val or None
 
-def resolve_model(agent_num: str) -> Optional[str]:
+
+def resolve_model(agent_num: str) -> str | None:
     if llm_mode() == "global":
         return llm_global_model()
     return llm_agent_model(agent_num)
@@ -77,11 +84,13 @@ def resolve_model(agent_num: str) -> Optional[str]:
 
 # ── CDP ───────────────────────────────────────────────────────────────────────
 
+
 def cdp_ssh_user() -> str:
     return _get(["cdp", "ssh_user"], "CDP_SSH_USER", "hadoop")
 
 
 # ── Slack ─────────────────────────────────────────────────────────────────────
+
 
 def slack_channel_id() -> str:
     return _get(["slack", "channel_id"], "SLACK_CHANNEL_ID")
@@ -89,14 +98,18 @@ def slack_channel_id() -> str:
 
 # ── GCP ───────────────────────────────────────────────────────────────────────
 
+
 def gcp_project_id() -> str:
     return _get(["gcp", "project_id"], "GCP_PROJECT_ID")
+
 
 def gcp_region() -> str:
     return _get(["gcp", "region"], "GCP_REGION", "us-central1")
 
+
 def gcp_gcs_bucket() -> str:
     return _get(["gcp", "gcs_bucket_logs"], "GCS_BUCKET_LOGS")
+
 
 def gcp_bq_dataset() -> str:
     return _get(["gcp", "bq_log_dataset"], "BQ_LOG_DATASET")

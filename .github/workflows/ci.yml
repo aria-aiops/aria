@@ -19,13 +19,19 @@ jobs:
           cache: pip
 
       - name: Install dependencies
-        run: pip install black isort
+        run: pip install black isort ruff mypy -r requirements.txt
 
       - name: black
         run: black --check .
 
       - name: isort
         run: isort --check-only .
+
+      - name: ruff
+        run: ruff check .
+
+      - name: mypy
+        run: mypy .
 
   unit-tests:
     name: Unit tests

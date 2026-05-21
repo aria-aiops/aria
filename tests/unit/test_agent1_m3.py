@@ -3,8 +3,6 @@
 from datetime import datetime
 from unittest.mock import MagicMock
 
-import pytest
-
 from core.agents.incident_reader import IncidentReaderAgent
 from core.models import AffectedResource, CIClass, IncidentMetadata, PipelineState, Priority
 
@@ -22,7 +20,7 @@ def _make_metadata(**kwargs) -> IncidentMetadata:
         opened_at=datetime(2026, 4, 28, 10, 0, 0),
     )
     defaults.update(kwargs)
-    return IncidentMetadata(**defaults)
+    return IncidentMetadata(**defaults)  # type: ignore[arg-type]
 
 
 def _make_agent(

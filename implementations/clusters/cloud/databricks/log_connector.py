@@ -13,7 +13,6 @@ ARI-50
 
 import logging
 from datetime import datetime, timezone
-from typing import Optional
 
 import requests
 
@@ -152,7 +151,7 @@ def _fetch_events(
         resp = requests.post(
             f"{db_host}/api/2.0/clusters/events",
             headers=headers,
-            json=payload,
+            json=payload,  # type: ignore[arg-type]
             timeout=30,
         )
         resp.raise_for_status()
@@ -169,7 +168,7 @@ def _fetch_events(
     return lines
 
 
-def _event_to_log_line(event: dict, cluster_id: str) -> Optional[LogLine]:
+def _event_to_log_line(event: dict, cluster_id: str) -> LogLine | None:
     try:
         ts_ms = event.get("timestamp")
         if ts_ms is None:

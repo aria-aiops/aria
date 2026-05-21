@@ -13,9 +13,6 @@ ARI-52
 import logging
 import re
 from datetime import datetime, timezone
-from typing import Optional
-
-_SAFE_HOST_RE = re.compile(r"^[A-Za-z0-9._\-]+$")
 
 from core.exceptions import LogStoreUnavailableError
 from core.interfaces.log_store import LogStoreInterface
@@ -23,6 +20,8 @@ from core.interfaces.vault import VaultInterface
 from core.models import ConfidenceBand, LogLine, LogQueryResult, PlatformTag
 
 logger = logging.getLogger(__name__)
+
+_SAFE_HOST_RE = re.compile(r"^[A-Za-z0-9._\-]+$")
 
 _LEVEL_PRIORITY = {"ERROR": 0, "FATAL": 0, "WARN": 1, "WARNING": 1, "INFO": 2, "DEBUG": 3}
 
@@ -105,8 +104,8 @@ class AzureLogConnector(LogStoreInterface):
             )
 
         lines: list[LogLine] = []
-        for table in response.tables or []:
-            col_names = [c.name for c in table.columns]
+        for table in response.tables or []:  # type: ignore[union-attr]
+            col_names = [c.name for c in table.columns]  # type: ignore[union-attr]
             for row in table.rows:
                 ll = _row_to_log_line(dict(zip(col_names, row)), host)
                 if ll:
@@ -141,9 +140,7 @@ def _build_kql(table: str, host: str, keywords: list[str] | None, limit: int) ->
     severity_filter = '| where SeverityLevel in ("err", "crit", "alert", "emerg", "warning")'
     kw_filter = ""
     if keywords:
-        safe_kws = [
-            _escape_kql_string(k) for k in keywords[:10] if k and len(k) <= 100
-        ]
+        safe_kws = [_escape_kql_string(k) for k in keywords[:10] if k and len(k) <= 100]
         if safe_kws:
             kw_parts = " or ".join(f'SyslogMessage contains "{k}"' for k in safe_kws)
             kw_filter = f"| where {kw_parts}"
@@ -158,7 +155,7 @@ def _build_kql(table: str, host: str, keywords: list[str] | None, limit: int) ->
     )
 
 
-def _row_to_log_line(row: dict, host: str) -> Optional[LogLine]:
+def _row_to_log_line(row: dict, host: str) -> LogLine | None:
     try:
         ts = row.get("TimeGenerated")
         if ts is None:

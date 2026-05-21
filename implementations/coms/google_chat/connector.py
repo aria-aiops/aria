@@ -5,7 +5,7 @@ space settings (Space settings → Apps & Integrations → Add webhooks).
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import requests
 
@@ -14,7 +14,7 @@ from core.models import ConfidenceBand, NotificationPayload
 
 logger = logging.getLogger(__name__)
 
-_CONFIDENCE_COLORS: Dict[Optional[ConfidenceBand], str] = {
+_CONFIDENCE_COLORS: dict[ConfidenceBand | None, str] = {
     ConfidenceBand.HIGH: "#2eb886",
     ConfidenceBand.MEDIUM: "#daa038",
     ConfidenceBand.LOW: "#de3c3c",
@@ -22,10 +22,10 @@ _CONFIDENCE_COLORS: Dict[Optional[ConfidenceBand], str] = {
 }
 
 
-def _build_card(payload: NotificationPayload) -> Dict[str, Any]:
+def _build_card(payload: NotificationPayload) -> dict[str, Any]:
     title = f"ARIA Alert — {payload.incident_number} [{payload.priority}]"
 
-    widgets: List[Dict[str, Any]] = []
+    widgets: list[dict[str, Any]] = []
 
     if payload.short_description:
         widgets.append({"textParagraph": {"text": f"<b>{payload.short_description}</b>"}})
