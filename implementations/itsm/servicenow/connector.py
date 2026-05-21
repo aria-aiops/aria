@@ -52,9 +52,15 @@ class ServiceNowConnector(ConnectorInterface):
         user = cfg.snow_user()
         password = os.environ.get("SNOW_PASSWORD", "")
         if not instance:
-            raise ValueError("ServiceNow instance is not configured (set servicenow.instance in conf.yaml)")
+            raise ValueError(
+                "ServiceNow instance is not configured "
+                "(set servicenow.instance in conf.yaml or SNOW_INSTANCE env var)"
+            )
         if not user:
-            raise ValueError("ServiceNow user is not configured (set servicenow.user in conf.yaml)")
+            raise ValueError(
+                "ServiceNow user is not configured "
+                "(set servicenow.user in conf.yaml or SNOW_USER env var)"
+            )
         if not password:
             raise ValueError("Required environment variable 'SNOW_PASSWORD' is not set")
         self._instance = instance

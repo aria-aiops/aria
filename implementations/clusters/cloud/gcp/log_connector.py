@@ -162,9 +162,7 @@ def _build_filter(
             f'resource.labels.job_id="{safe_host}")'
         )
     if keywords:
-        safe_kws = [
-            _escape_filter_string(k) for k in keywords[:10] if k and len(k) <= 100
-        ]
+        safe_kws = [_escape_filter_string(k) for k in keywords[:10] if k and len(k) <= 100]
         if safe_kws:
             kw_parts = " OR ".join(f'textPayload:"{k}"' for k in safe_kws)
             parts.append(f"({kw_parts})")

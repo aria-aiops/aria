@@ -141,9 +141,7 @@ def _build_kql(table: str, host: str, keywords: list[str] | None, limit: int) ->
     severity_filter = '| where SeverityLevel in ("err", "crit", "alert", "emerg", "warning")'
     kw_filter = ""
     if keywords:
-        safe_kws = [
-            _escape_kql_string(k) for k in keywords[:10] if k and len(k) <= 100
-        ]
+        safe_kws = [_escape_kql_string(k) for k in keywords[:10] if k and len(k) <= 100]
         if safe_kws:
             kw_parts = " or ".join(f'SyslogMessage contains "{k}"' for k in safe_kws)
             kw_filter = f"| where {kw_parts}"
