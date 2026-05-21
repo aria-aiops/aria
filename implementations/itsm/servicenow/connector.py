@@ -14,7 +14,6 @@ Required env vars:
 import logging
 import os
 from datetime import datetime
-from typing import List, Optional
 
 import requests
 from requests.auth import HTTPBasicAuth
@@ -81,7 +80,7 @@ class ServiceNowConnector(ConnectorInterface):
             raise IncidentNotFoundError(f"Incident {incident_number} not found in ServiceNow")
         return self._parse(records[0])
 
-    def list_recent_incidents(self, limit: int = 10) -> List[IncidentMetadata]:
+    def list_recent_incidents(self, limit: int = 10) -> list[IncidentMetadata]:
         query = "state!=6^state!=7^ORDERBYDESCopened_at"
         if self._assignment_group:
             query = f"assignment_group.name={self._assignment_group}^{query}"

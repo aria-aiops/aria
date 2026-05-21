@@ -2,11 +2,9 @@
 
 import json
 from datetime import datetime
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock
 
-import pytest
-
-from core.agents.log_extractor import LogExtractorAgent, _empty
+from core.agents.log_extractor import LogExtractorAgent
 from core.interfaces.knowledge_base import KnowledgeBaseInterface
 from core.interfaces.llm_client import LLMClientInterface
 from core.interfaces.log_store import LogStoreInterface

@@ -22,7 +22,6 @@ import dataclasses
 import json
 import logging
 import re
-from typing import Optional
 
 from core.exceptions import LLMResponseError
 from core.interfaces.connector import ConnectorInterface
@@ -44,7 +43,7 @@ _PLATFORM_HINTS: list[tuple[list[str], "PlatformTag"]] = [
 ]
 
 
-def _guess_platform_tag(ci_name: str, description: str) -> "Optional[PlatformTag]":
+def _guess_platform_tag(ci_name: str, description: str) -> "PlatformTag | None":
     """Derive platform tag from CI name and description using keyword matching.
 
     Used in Paths 1 and 2 where LLM extraction is not called. Returns None
@@ -94,7 +93,7 @@ class IncidentReaderAgent:
         connector: ConnectorInterface,
         llm_client: LLMClientInterface,
         cmdb_resolver=None,
-        knowledge_base: Optional[KnowledgeBaseInterface] = None,
+        knowledge_base: KnowledgeBaseInterface | None = None,
     ) -> None:
         self._connector = connector
         self._llm = llm_client

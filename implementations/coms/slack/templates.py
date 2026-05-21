@@ -4,18 +4,18 @@ Produces a single attachment with a coloured sidebar (confidence band) and
 structured blocks for incident metadata, classification, evidence, and actions.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from core.models import ConfidenceBand, NotificationPayload
 
-_CONFIDENCE_COLORS: Dict[Optional[ConfidenceBand], str] = {
+_CONFIDENCE_COLORS: dict[ConfidenceBand | None, str] = {
     ConfidenceBand.HIGH: "#2eb886",  # green
     ConfidenceBand.MEDIUM: "#daa038",  # amber
     ConfidenceBand.LOW: "#de3c3c",  # red
     None: "#888888",  # grey — partial notification
 }
 
-_CONFIDENCE_EMOJI: Dict[Optional[ConfidenceBand], str] = {
+_CONFIDENCE_EMOJI: dict[ConfidenceBand | None, str] = {
     ConfidenceBand.HIGH: ":large_green_circle:",
     ConfidenceBand.MEDIUM: ":large_yellow_circle:",
     ConfidenceBand.LOW: ":red_circle:",
@@ -30,10 +30,10 @@ _PRIORITY_EMOJI = {
 }
 
 
-def build_attachment(payload: NotificationPayload) -> Dict[str, Any]:
+def build_attachment(payload: NotificationPayload) -> dict[str, Any]:
     """Return a Slack attachment dict containing Block Kit blocks."""
     color = _CONFIDENCE_COLORS.get(payload.confidence_band, "#888888")
-    blocks: List[Dict[str, Any]] = []
+    blocks: list[dict[str, Any]] = []
 
     # Header
     priority_emoji = _PRIORITY_EMOJI.get(payload.priority, ":bell:")

@@ -6,9 +6,8 @@ No network calls — safe to use in unit tests and dry-run mode.
 
 import uuid
 from collections import deque
-from typing import Any, Dict, Optional
+from typing import Any
 
-from core.exceptions import QueuePublishError, QueueSubscribeError
 from core.interfaces.queue import QueueInterface
 
 
@@ -23,9 +22,9 @@ class InMemoryQueue(QueueInterface):
 
     def __init__(self) -> None:
         # topic_name → deque of (message_id, payload) tuples
-        self._topics: Dict[str, deque] = {}
+        self._topics: dict[str, deque] = {}
 
-    def publish(self, topic: str, message: Dict[str, Any]) -> str:
+    def publish(self, topic: str, message: dict[str, Any]) -> str:
         """Add a message to the named topic.
 
         Args:
@@ -45,7 +44,7 @@ class InMemoryQueue(QueueInterface):
         self._topics[topic].append((message_id, message))
         return message_id
 
-    def subscribe(self, subscription: str) -> Optional[Dict[str, Any]]:
+    def subscribe(self, subscription: str) -> dict[str, Any] | None:
         """Pull the next message from the named topic/subscription.
 
         Non-blocking — returns None immediately if the topic is empty.

@@ -9,7 +9,6 @@ the process environment injected by Infisical or a local .env file.
 import os
 from functools import lru_cache
 from pathlib import Path
-from typing import Optional
 
 
 @lru_cache(maxsize=1)
@@ -67,17 +66,17 @@ def llm_mode() -> str:
     return _get(["llm", "mode"], "ARIA_LLM_MODE", "modular")
 
 
-def llm_global_model() -> Optional[str]:
+def llm_global_model() -> str | None:
     val = _get(["llm", "global_model"], "ARIA_GLOBAL_MODEL")
     return val or None
 
 
-def llm_agent_model(agent_num: str) -> Optional[str]:
+def llm_agent_model(agent_num: str) -> str | None:
     val = _get(["llm", "agents", f"agent{agent_num}"], f"ARIA_AGENT{agent_num}_MODEL")
     return val or None
 
 
-def resolve_model(agent_num: str) -> Optional[str]:
+def resolve_model(agent_num: str) -> str | None:
     if llm_mode() == "global":
         return llm_global_model()
     return llm_agent_model(agent_num)

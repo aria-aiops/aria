@@ -9,7 +9,6 @@ Example:
 """
 
 import os
-from typing import Dict, List, Optional
 
 import anthropic
 
@@ -32,12 +31,12 @@ class AnthropicLLMClient(LLMClientInterface):
 
     def complete(
         self,
-        messages: List[Dict[str, str]],
+        messages: list[dict[str, str]],
         max_tokens: int = 1024,
         temperature: float = 0.0,
-        system: Optional[str] = None,
+        system: str | None = None,
     ) -> str:
-        kwargs: Dict = {
+        kwargs: dict = {
             "model": self._model,
             "max_tokens": max_tokens,
             "messages": messages,

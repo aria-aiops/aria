@@ -13,9 +13,6 @@ ARI-52
 import logging
 import re
 from datetime import datetime, timezone
-from typing import Optional
-
-_SAFE_HOST_RE = re.compile(r"^[A-Za-z0-9._\-]+$")
 
 from core.exceptions import LogStoreUnavailableError
 from core.interfaces.log_store import LogStoreInterface
@@ -23,6 +20,8 @@ from core.interfaces.vault import VaultInterface
 from core.models import ConfidenceBand, LogLine, LogQueryResult, PlatformTag
 
 logger = logging.getLogger(__name__)
+
+_SAFE_HOST_RE = re.compile(r"^[A-Za-z0-9._\-]+$")
 
 _LEVEL_PRIORITY = {"ERROR": 0, "FATAL": 0, "WARN": 1, "WARNING": 1, "INFO": 2, "DEBUG": 3}
 
@@ -156,7 +155,7 @@ def _build_kql(table: str, host: str, keywords: list[str] | None, limit: int) ->
     )
 
 
-def _row_to_log_line(row: dict, host: str) -> Optional[LogLine]:
+def _row_to_log_line(row: dict, host: str) -> LogLine | None:
     try:
         ts = row.get("TimeGenerated")
         if ts is None:

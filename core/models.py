@@ -7,7 +7,7 @@ All agents communicate via these types — never raw dicts.
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 
 class Priority(str, Enum):
@@ -60,7 +60,7 @@ class AffectedResource:
     """
 
     name: str
-    ip_address: Optional[str] = None
+    ip_address: str | None = None
 
 
 @dataclass
@@ -72,25 +72,25 @@ class IncidentMetadata:
     """
 
     incident_number: str
-    caller: Optional[str]
+    caller: str | None
     short_description: str
     long_description: str
     priority: Priority
     state: str
-    affected_ci: Optional[str]
-    assigned_group: Optional[str]
+    affected_ci: str | None
+    assigned_group: str | None
     opened_at: datetime
-    raw_record: Dict[str, Any] = field(default_factory=dict)
+    raw_record: dict[str, Any] = field(default_factory=dict)
     # M3 additions (ARI-44): populated by CMDBResolver + Agent 1 resolution
-    ci_class: Optional[CIClass] = None
+    ci_class: CIClass | None = None
     # Validated resources extracted from description + confirmed via CMDB/KB.
     # Carries IP addresses for direct connection. Single resource → affected_ci
     # is also set. Multiple resources → affected_ci is None, query all.
-    affected_resources: List[AffectedResource] = field(default_factory=list)
+    affected_resources: list[AffectedResource] = field(default_factory=list)
     # IP for the primary affected_ci — resolved from CMDB. None when unavailable.
-    affected_ci_ip: Optional[str] = None
+    affected_ci_ip: str | None = None
     # M3 addition (ARI-13): set by Agent 1 LLM extraction for Agent 2 routing
-    platform_tag: Optional[PlatformTag] = None
+    platform_tag: PlatformTag | None = None
 
 
 @dataclass
@@ -104,9 +104,9 @@ class LogAccessHint:
     """
 
     platform_tag: PlatformTag
-    log_paths: List[str]
-    keywords: List[str]
-    aggregator_endpoint: Optional[str] = None
+    log_paths: list[str]
+    keywords: list[str]
+    aggregator_endpoint: str | None = None
     confidence: float = 0.0
 
 
@@ -124,7 +124,7 @@ class LogLine:
 class LogQueryResult:
     """Structured output of Agent 2 — Log Finder."""
 
-    log_lines: List[LogLine]
+    log_lines: list[LogLine]
     query_executed: str
     total_scanned: int
     confidence: ConfidenceBand
@@ -139,8 +139,8 @@ class LogQueryPlan:
     """
 
     connector_name: str  # PlatformTag.value, e.g. "cdp", "gcp"
-    log_paths: List[str]
-    keywords: List[str]
+    log_paths: list[str]
+    keywords: list[str]
     time_window_minutes: int
     reasoning: str  # LLM explanation — used for trace/debug
 
@@ -165,8 +165,8 @@ class ClassificationResult:
     error_label: str
     confidence: float  # 0.0 to 1.0
     confidence_band: ConfidenceBand
-    supporting_evidence: List[str]
-    recommended_actions: List[str]
+    supporting_evidence: list[str]
+    recommended_actions: list[str]
 
 
 @dataclass
@@ -183,13 +183,13 @@ class NotificationPayload:
     priority: str
     platform: str
     short_description: str
-    affected_ci: Optional[str]
-    classification_label: Optional[str]
+    affected_ci: str | None
+    classification_label: str | None
     confidence_band: Optional["ConfidenceBand"]
-    confidence_score: Optional[float]
-    evidence: List[str]
-    recommended_actions: List[str]
-    log_summary: Optional[str]
+    confidence_score: float | None
+    evidence: list[str]
+    recommended_actions: list[str]
+    log_summary: str | None
     is_partial: bool
 
 
@@ -203,10 +203,10 @@ class PipelineState:
     """
 
     incident_number: str
-    incident_metadata: Optional[IncidentMetadata] = None
-    log_result: Optional[LogQueryResult] = None
-    log_query_plan: Optional[LogQueryPlan] = None
-    classification: Optional[ClassificationResult] = None
-    approval_status: Optional[ApprovalStatus] = None
+    incident_metadata: IncidentMetadata | None = None
+    log_result: LogQueryResult | None = None
+    log_query_plan: LogQueryPlan | None = None
+    classification: ClassificationResult | None = None
+    approval_status: ApprovalStatus | None = None
     notification_sent: bool = False
-    error: Optional[str] = None
+    error: str | None = None

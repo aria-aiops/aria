@@ -7,7 +7,7 @@ No network calls — safe to use in unit tests and dry-run mode.
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from core.interfaces.log_store import LogStoreInterface
 from core.models import ConfidenceBand, LogLine, LogQueryResult, PlatformTag
@@ -26,13 +26,13 @@ class InMemoryLogStore(LogStoreInterface):
 
     def __init__(
         self,
-        log_lines: Optional[List[Dict[str, Any]]] = None,
-        fixture_path: Optional[Path] = None,
+        log_lines: list[dict[str, Any]] | None = None,
+        fixture_path: Path | None = None,
     ) -> None:
         if fixture_path is not None:
             with open(fixture_path) as f:
                 log_lines = [json.loads(line) for line in f if line.strip()]
-        self._log_lines: List[Dict[str, Any]] = log_lines or []
+        self._log_lines: list[dict[str, Any]] = log_lines or []
 
     def query_logs(
         self,

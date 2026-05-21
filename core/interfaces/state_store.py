@@ -5,7 +5,7 @@ process restarts — critical for the Phase 2 approval gate timeout handling.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional
+from typing import Any
 
 
 class StateStoreInterface(ABC):
@@ -20,7 +20,7 @@ class StateStoreInterface(ABC):
     """
 
     @abstractmethod
-    def save(self, key: str, value: Dict[str, Any]) -> None:
+    def save(self, key: str, value: dict[str, Any]) -> None:
         """Persist a state entry.
 
         Args:
@@ -32,7 +32,7 @@ class StateStoreInterface(ABC):
         """
 
     @abstractmethod
-    def get(self, key: str) -> Optional[Dict[str, Any]]:
+    def get(self, key: str) -> dict[str, Any] | None:
         """Retrieve a state entry by key.
 
         Args:

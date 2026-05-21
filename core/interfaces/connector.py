@@ -5,7 +5,6 @@ Concrete implementations live in /implementations/.
 """
 
 from abc import ABC, abstractmethod
-from typing import List
 
 from core.models import IncidentMetadata
 
@@ -34,7 +33,7 @@ class ConnectorInterface(ABC):
         """
 
     @abstractmethod
-    def list_recent_incidents(self, limit: int = 10) -> List[IncidentMetadata]:
+    def list_recent_incidents(self, limit: int = 10) -> list[IncidentMetadata]:
         """List the most recently opened incidents.
 
         Used by the orchestrator to poll for new work when no queue is available.

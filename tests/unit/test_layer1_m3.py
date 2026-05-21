@@ -3,12 +3,11 @@
 ARI-43 · ARI-44 · ARI-58
 """
 
-import os
 from datetime import datetime
 
 import pytest
 
-from core.exceptions import KnowledgeBaseError, VaultSecretNotFoundError
+from core.exceptions import VaultSecretNotFoundError
 from core.interfaces.knowledge_base import KnowledgeBaseInterface
 from core.interfaces.vault import VaultInterface
 from core.models import (

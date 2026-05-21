@@ -14,7 +14,6 @@ import gzip
 import logging
 import re
 from datetime import datetime, timedelta
-from typing import Optional
 
 from core.exceptions import LogStoreUnavailableError, VaultSecretNotFoundError
 from core.interfaces.log_store import LogStoreInterface
@@ -155,7 +154,7 @@ def _fetch_s3_log(
         return []
 
 
-def _parse_line(line: str, host: str) -> Optional[LogLine]:
+def _parse_line(line: str, host: str) -> LogLine | None:
     m = _LOG_RE.match(line.strip())
     if not m:
         return None

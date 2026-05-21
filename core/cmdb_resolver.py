@@ -8,7 +8,6 @@ ARI-45
 
 import logging
 import os
-from typing import Optional
 
 import requests
 from requests.auth import HTTPBasicAuth
@@ -92,7 +91,7 @@ class CMDBResolver:
             logger.warning("CMDBResolver.get_ci_class failed for %r: %s", ci_name, exc)
             return CIClass.UNKNOWN
 
-    def get_ip(self, ci_name: str) -> Optional[str]:
+    def get_ip(self, ci_name: str) -> str | None:
         """Return the IP address of a named CI from CMDB. Returns None on miss or error."""
         try:
             resp = requests.get(
@@ -115,7 +114,7 @@ class CMDBResolver:
             logger.warning("CMDBResolver.get_ip failed for %r: %s", ci_name, exc)
             return None
 
-    def get_parent_cluster(self, ci_name: str) -> Optional[str]:
+    def get_parent_cluster(self, ci_name: str) -> str | None:
         """Return the cluster that contains ci_name as a member. Returns None if not found."""
         try:
             resp = requests.get(

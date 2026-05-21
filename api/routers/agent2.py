@@ -6,8 +6,6 @@ GET  /agent2/health — connector readiness check
 
 import os
 import time
-from datetime import datetime
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException
 

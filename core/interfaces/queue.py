@@ -5,7 +5,7 @@ and fan out work between pipeline stages.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional
+from typing import Any
 
 
 class QueueInterface(ABC):
@@ -17,7 +17,7 @@ class QueueInterface(ABC):
     """
 
     @abstractmethod
-    def publish(self, topic: str, message: Dict[str, Any]) -> str:
+    def publish(self, topic: str, message: dict[str, Any]) -> str:
         """Publish a message to a topic.
 
         Args:
@@ -32,7 +32,7 @@ class QueueInterface(ABC):
         """
 
     @abstractmethod
-    def subscribe(self, subscription: str) -> Optional[Dict[str, Any]]:
+    def subscribe(self, subscription: str) -> dict[str, Any] | None:
         """Pull the next available message from a subscription.
 
         Non-blocking — returns None immediately if no message is available.

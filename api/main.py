@@ -12,9 +12,9 @@ import logging
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
-logger = logging.getLogger(__name__)
-
 from api.routers import agent1, agent2, agent4, health
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="ARIA Agent API",

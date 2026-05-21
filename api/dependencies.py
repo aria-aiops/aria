@@ -8,7 +8,6 @@ will fail with a clear 503 at request time rather than crashing on boot.
 
 import os
 from functools import lru_cache
-from typing import Optional
 
 import core.config as cfg
 from core.agents.incident_reader import IncidentReaderAgent
@@ -22,7 +21,7 @@ from implementations.llm.anthropic.llm_client import AnthropicLLMClient
 from implementations.vault.envvar import EnvVarVault
 
 
-def _resolve_model(agent_num: str) -> Optional[str]:
+def _resolve_model(agent_num: str) -> str | None:
     return cfg.resolve_model(agent_num)
 
 

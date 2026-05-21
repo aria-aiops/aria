@@ -5,7 +5,7 @@ interface contracts correctly. Every test here is a sanity check
 that will catch regressions when we swap in real implementations.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -99,8 +99,8 @@ class TestInMemoryLogStore:
         )
         levels = [line.level for line in result.log_lines]
         # All ERRORs must appear before WARNs
-        last_error_idx = max(i for i, l in enumerate(levels) if l == "ERROR")
-        first_warn_idx = min(i for i, l in enumerate(levels) if l == "WARN")
+        last_error_idx = max(i for i, lv in enumerate(levels) if lv == "ERROR")
+        first_warn_idx = min(i for i, lv in enumerate(levels) if lv == "WARN")
         assert last_error_idx > first_warn_idx is False or last_error_idx < len(levels)
 
     def test_returns_empty_result_when_no_logs_found(self, log_store):

@@ -7,11 +7,8 @@ Tests cover the generic on-premise SSH connector used for CDP, HDP, Oracle, etc.
 from datetime import datetime
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from core.models import ConfidenceBand, PlatformTag
 from implementations.clusters.onprem.log_connector import (
-    _DEFAULT_KEYWORDS,
     SSHLogConnector,
     _parse_line,
 )
@@ -82,7 +79,7 @@ def test_ssh_success_returns_log_lines(mock_ssh_cls, mock_load_key):
     stdout.read.return_value = (
         f"{_IN_WINDOW} ERROR org.apache.NameNode: OOM heap\n"
         f"{_IN_WINDOW} WARN org.apache.DataNode: disk full\n"
-    ).encode("utf-8")
+    ).encode()
     mock_client.exec_command.return_value = (None, stdout, None)
 
     result = _make_connector().query_logs(_HOST, PlatformTag.CDP, _START, _END)
@@ -118,7 +115,7 @@ def test_time_window_filtering(mock_ssh_cls, mock_load_key):
     stdout.read.return_value = (
         f"{_IN_WINDOW} ERROR NameNode: in-window error\n"
         f"{_OUT_OF_WINDOW} ERROR NameNode: out-of-window error\n"
-    ).encode("utf-8")
+    ).encode()
     mock_client.exec_command.return_value = (None, stdout, None)
 
     result = _make_connector().query_logs(_HOST, PlatformTag.CDP, _START, _END)
@@ -181,7 +178,7 @@ def test_error_before_warn_in_output(mock_ssh_cls, mock_load_key):
     stdout.read.return_value = (
         f"{_IN_WINDOW} WARN NameNode: disk almost full\n"
         f"{_IN_WINDOW} ERROR NameNode: disk full OOM\n"
-    ).encode("utf-8")
+    ).encode()
     mock_client.exec_command.return_value = (None, stdout, None)
 
     result = _make_connector().query_logs(_HOST, PlatformTag.CDP, _START, _END)

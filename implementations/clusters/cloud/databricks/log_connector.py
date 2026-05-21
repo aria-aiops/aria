@@ -13,7 +13,6 @@ ARI-50
 
 import logging
 from datetime import datetime, timezone
-from typing import Optional
 
 import requests
 
@@ -169,7 +168,7 @@ def _fetch_events(
     return lines
 
 
-def _event_to_log_line(event: dict, cluster_id: str) -> Optional[LogLine]:
+def _event_to_log_line(event: dict, cluster_id: str) -> LogLine | None:
     try:
         ts_ms = event.get("timestamp")
         if ts_ms is None:

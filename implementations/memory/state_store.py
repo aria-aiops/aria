@@ -4,7 +4,7 @@ Stores pipeline state in a plain dict. State is lost on process restart —
 acceptable for Phase 1 (notify-only, no approval wait needed).
 """
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 from core.interfaces.state_store import StateStoreInterface
 
@@ -17,9 +17,9 @@ class InMemoryStateStore(StateStoreInterface):
     """
 
     def __init__(self) -> None:
-        self._store: Dict[str, Dict[str, Any]] = {}
+        self._store: dict[str, dict[str, Any]] = {}
 
-    def save(self, key: str, value: Dict[str, Any]) -> None:
+    def save(self, key: str, value: dict[str, Any]) -> None:
         """Persist a state entry in memory.
 
         Args:
@@ -28,7 +28,7 @@ class InMemoryStateStore(StateStoreInterface):
         """
         self._store[key] = value
 
-    def get(self, key: str) -> Optional[Dict[str, Any]]:
+    def get(self, key: str) -> dict[str, Any] | None:
         """Retrieve a state entry by incident number.
 
         Args:

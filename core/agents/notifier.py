@@ -9,7 +9,6 @@ on-call engineers are always informed even if Agent 3 did not run.
 """
 
 import logging
-from typing import Optional
 
 from core.interfaces.communicator import CommunicatorInterface
 from core.interfaces.llm_client import LLMClientInterface
@@ -22,7 +21,7 @@ class NotifierAgent:
     def __init__(
         self,
         communicator: CommunicatorInterface,
-        llm_client: Optional[LLMClientInterface] = None,
+        llm_client: LLMClientInterface | None = None,
     ) -> None:
         self._comm = communicator
         self._llm = llm_client  # unused in Phase 1; wired for Phase 2 response interpretation
