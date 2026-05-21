@@ -12,7 +12,6 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException
 
 import core.config as cfg
-
 from api.dependencies import get_agent1, get_agent2
 from api.schemas import (
     Agent2Data,

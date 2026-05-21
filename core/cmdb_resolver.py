@@ -10,11 +10,10 @@ import logging
 import os
 from typing import Optional
 
-import core.config as cfg
-
 import requests
 from requests.auth import HTTPBasicAuth
 
+import core.config as cfg
 from core.models import AffectedResource, CIClass
 
 logger = logging.getLogger(__name__)

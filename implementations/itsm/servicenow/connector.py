@@ -16,11 +16,10 @@ import os
 from datetime import datetime
 from typing import List, Optional
 
-import core.config as cfg
-
 import requests
 from requests.auth import HTTPBasicAuth
 
+import core.config as cfg
 from core.exceptions import ConnectorAuthError, ConnectorUnavailableError, IncidentNotFoundError
 from core.interfaces.connector import ConnectorInterface
 from core.models import IncidentMetadata, Priority
