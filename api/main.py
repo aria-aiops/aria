@@ -12,7 +12,7 @@ import logging
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from api.routers import agent1, agent2, agent4, health
+from api.routers import agent1, agent2, agent4, health, pipeline
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +34,7 @@ app.include_router(health.router, prefix="/api/v1")
 app.include_router(agent1.router, prefix="/api/v1")
 app.include_router(agent2.router, prefix="/api/v1")
 app.include_router(agent4.router, prefix="/api/v1")
+app.include_router(pipeline.router, prefix="/api/v1")
 
 # ── Global error handler — always return JSON, never HTML ──────────────────────
 

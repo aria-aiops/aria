@@ -96,6 +96,18 @@ def slack_channel_id() -> str:
     return _get(["slack", "channel_id"], "SLACK_CHANNEL_ID")
 
 
+# ── Pipeline ──────────────────────────────────────────────────────────────────
+
+
+def dry_run() -> bool:
+    """Return True when ARIA_DRY_RUN is set to 'true' or '1'.
+
+    Dry-run mode injects in-memory stubs for all connectors so the full pipeline
+    can be exercised without real ServiceNow/Slack/SSH credentials.
+    """
+    return os.environ.get("ARIA_DRY_RUN", "").lower() in ("true", "1")
+
+
 # ── GCP ───────────────────────────────────────────────────────────────────────
 
 

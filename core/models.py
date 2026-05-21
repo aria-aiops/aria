@@ -210,3 +210,8 @@ class PipelineState:
     approval_status: ApprovalStatus | None = None
     notification_sent: bool = False
     error: str | None = None
+    # M6 ReAct loop fields
+    # Agent 3 sets this when evidence is insufficient; Agent 2 reads it on re-entry.
+    # The orchestrator clears it after each Agent 2 invocation.
+    pending_log_request: LogRequest | None = None
+    loop_iterations: int = 0  # incremented by the orchestrator each time Agent 2 runs
