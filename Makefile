@@ -1,19 +1,27 @@
-.PHONY: format lint test ci install-hooks
+VENV := .venv
+PY   := $(VENV)/bin/python
+BIN  := $(VENV)/bin
+
+.PHONY: format lint test ci install-hooks venv
+
+venv:
+	python3 -m venv $(VENV)
+	$(BIN)/pip install -q -r requirements.txt black isort ruff mypy pre-commit
 
 format:
-	black .
-	isort .
+	$(BIN)/black .
+	$(BIN)/isort .
 
 lint:
-	black --check .
-	isort --check-only .
-	ruff check .
-	mypy .
+	$(BIN)/black --check .
+	$(BIN)/isort --check-only .
+	$(BIN)/ruff check .
+	$(BIN)/mypy .
 
 test:
-	pytest tests/unit/ -v
+	$(BIN)/pytest tests/unit/ -v
 
 ci: lint test
 
 install-hooks:
-	pre-commit install
+	$(BIN)/pre-commit install
