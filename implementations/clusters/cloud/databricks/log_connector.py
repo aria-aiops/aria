@@ -151,7 +151,7 @@ def _fetch_events(
         resp = requests.post(
             f"{db_host}/api/2.0/clusters/events",
             headers=headers,
-            json=payload,
+            json=payload,  # type: ignore[arg-type]
             timeout=30,
         )
         resp.raise_for_status()

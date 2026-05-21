@@ -104,8 +104,8 @@ class AzureLogConnector(LogStoreInterface):
             )
 
         lines: list[LogLine] = []
-        for table in response.tables or []:
-            col_names = [c.name for c in table.columns]
+        for table in response.tables or []:  # type: ignore[union-attr]
+            col_names = [c.name for c in table.columns]  # type: ignore[union-attr]
             for row in table.rows:
                 ll = _row_to_log_line(dict(zip(col_names, row)), host)
                 if ll:

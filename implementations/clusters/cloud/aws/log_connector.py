@@ -14,6 +14,7 @@ import gzip
 import logging
 import re
 from datetime import datetime, timedelta
+from typing import Any
 
 from core.exceptions import LogStoreUnavailableError, VaultSecretNotFoundError
 from core.interfaces.log_store import LogStoreInterface
@@ -135,7 +136,7 @@ class AWSEMRLogConnector(LogStoreInterface):
 
 
 def _fetch_s3_log(
-    s3, bucket: str, key: str, host: str, start_time: datetime, end_time: datetime
+    s3: Any, bucket: str, key: str, host: str, start_time: datetime, end_time: datetime
 ) -> list[LogLine]:
     try:
         resp = s3.get_object(Bucket=bucket, Key=key)

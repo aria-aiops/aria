@@ -22,6 +22,7 @@ import dataclasses
 import json
 import logging
 import re
+from typing import Any
 
 from core.exceptions import LLMResponseError
 from core.interfaces.connector import ConnectorInterface
@@ -92,7 +93,7 @@ class IncidentReaderAgent:
         self,
         connector: ConnectorInterface,
         llm_client: LLMClientInterface,
-        cmdb_resolver=None,
+        cmdb_resolver: "Any | None" = None,
         knowledge_base: KnowledgeBaseInterface | None = None,
     ) -> None:
         self._connector = connector
@@ -147,7 +148,7 @@ class IncidentReaderAgent:
         ci = metadata.affected_ci
         ip = self._cmdb.get_ip(ci) if self._cmdb else None
 
-        primary = AffectedResource(name=ci, ip_address=ip)
+        primary = AffectedResource(name=ci or "", ip_address=ip)
         resources: list[AffectedResource] = [primary]
 
         # Cross-check: look for siblings (CMDB cluster members) mentioned in description
@@ -165,7 +166,9 @@ class IncidentReaderAgent:
                             sibling.ip_address,
                         )
 
-        platform_tag = metadata.platform_tag or _guess_platform_tag(ci, metadata.long_description)
+        platform_tag = metadata.platform_tag or _guess_platform_tag(
+            ci or "", metadata.long_description
+        )
         logger.info(
             "Agent 1 path 1 (fast): %r is a %s ip=%s extra=%d platform_tag=%s",
             ci,
@@ -208,7 +211,7 @@ class IncidentReaderAgent:
 
         # LLM extracts resource names from description (prefers KB hints as candidates)
         extracted: list[str] = self._extract_resources_from_description(
-            cluster, metadata.long_description, hints
+            cluster or "", metadata.long_description or "", hints
         )
 
         # Validate each extracted name against CMDB members or KB hints
@@ -221,7 +224,7 @@ class IncidentReaderAgent:
                 validated.append(AffectedResource(name=name, ip_address=ip))
 
         platform_tag = metadata.platform_tag or _guess_platform_tag(
-            cluster, metadata.long_description
+            cluster or "", metadata.long_description or ""
         )
         raw = {
             **metadata.raw_record,

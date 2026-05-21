@@ -68,7 +68,7 @@ class CMDBResolver:
             resp = requests.get(
                 f"{self._base}/cmdb_ci",
                 auth=self._auth,
-                params={
+                params={  # type: ignore[arg-type]
                     "sysparm_query": f"name={ci_name}",
                     "sysparm_fields": "name,sys_class_name",
                     "sysparm_limit": 1,
@@ -97,7 +97,7 @@ class CMDBResolver:
             resp = requests.get(
                 f"{self._base}/cmdb_ci",
                 auth=self._auth,
-                params={
+                params={  # type: ignore[arg-type]
                     "sysparm_query": f"name={ci_name}",
                     "sysparm_fields": "name,ip_address",
                     "sysparm_limit": 1,
@@ -120,7 +120,7 @@ class CMDBResolver:
             resp = requests.get(
                 f"{self._base}/cmdb_rel_ci",
                 auth=self._auth,
-                params={
+                params={  # type: ignore[arg-type]
                     "sysparm_query": f"child.name={ci_name}^type.name={self._rel_type}",
                     "sysparm_fields": "parent",
                     "sysparm_display_value": "true",
@@ -146,7 +146,7 @@ class CMDBResolver:
             resp = requests.get(
                 f"{self._base}/cmdb_rel_ci",
                 auth=self._auth,
-                params={
+                params={  # type: ignore[arg-type]
                     "sysparm_query": (
                         f"parent.name={cluster_name}^child.name={ci_name}"
                         f"^type.name={self._rel_type}"
@@ -170,7 +170,7 @@ class CMDBResolver:
             resp = requests.get(
                 f"{self._base}/cmdb_rel_ci",
                 auth=self._auth,
-                params={
+                params={  # type: ignore[arg-type]
                     "sysparm_query": (f"parent.name={cluster_name}^type.name={self._rel_type}"),
                     "sysparm_fields": "child",
                     "sysparm_display_value": "true",

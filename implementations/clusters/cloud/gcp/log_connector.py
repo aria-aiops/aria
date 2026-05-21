@@ -15,6 +15,7 @@ import json
 import logging
 import re
 from datetime import datetime, timezone
+from typing import Any
 
 from core.exceptions import LogStoreUnavailableError
 from core.interfaces.log_store import LogStoreInterface
@@ -124,7 +125,7 @@ class GCPLogConnector(LogStoreInterface):
 
     # ── Internal ─────────────────────────────────────────────────────────────
 
-    def _build_client(self, sa_json: str):
+    def _build_client(self, sa_json: str) -> tuple[Any, str]:
         from google.cloud import logging as gcp_logging  # noqa: PLC0415
         from google.oauth2 import service_account  # noqa: PLC0415
 
@@ -176,7 +177,7 @@ def _rfc3339(dt: datetime) -> str:
     return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _entry_to_log_line(entry, host: str) -> LogLine | None:
+def _entry_to_log_line(entry: Any, host: str) -> LogLine | None:
     try:
         ts = getattr(entry, "timestamp", None)
         if ts is None:

@@ -58,6 +58,7 @@ def run_agent1(request: Agent1RunRequest) -> Agent1Response:
         )
 
     meta = result.incident_metadata
+    assert meta is not None
     llm_raw = meta.raw_record.get("_llm_extraction")
     llm_detail = LLMExtractionDetail(**llm_raw) if llm_raw else None
 

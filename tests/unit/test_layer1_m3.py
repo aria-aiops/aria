@@ -66,7 +66,7 @@ class TestIncidentMetadataExtensions:
             opened_at=datetime(2026, 4, 28, 10, 0, 0),
         )
         defaults.update(kwargs)
-        return IncidentMetadata(**defaults)
+        return IncidentMetadata(**defaults)  # type: ignore[arg-type]
 
     def test_defaults_to_no_ci_class(self):
         inc = self._make_incident()
@@ -150,4 +150,4 @@ class TestKnowledgeBaseInterfaceContract:
 
     def test_cannot_instantiate_abc(self):
         with pytest.raises(TypeError):
-            KnowledgeBaseInterface()  # type: ignore[abstract]
+            KnowledgeBaseInterface()

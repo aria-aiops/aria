@@ -14,6 +14,7 @@ Required env vars:
 import logging
 import os
 from datetime import datetime
+from typing import Any
 
 import requests
 from requests.auth import HTTPBasicAuth
@@ -134,14 +135,14 @@ class ServiceNowConnector(ConnectorInterface):
         )
 
     @staticmethod
-    def _display(value) -> str:
+    def _display(value: Any) -> str:
         """Return the display_value from a sysparm_display_value=all field dict, or the raw string."""
         if isinstance(value, dict):
             return value.get("display_value") or ""
         return value or ""
 
     @staticmethod
-    def _raw_value(value) -> str:
+    def _raw_value(value: Any) -> str:
         """Return the raw UTC value from a sysparm_display_value=all field dict, or the string."""
         if isinstance(value, dict):
             return value.get("value") or ""

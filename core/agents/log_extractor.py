@@ -133,6 +133,7 @@ class LogExtractorAgent:
         Raises on any error — callers catch and fall back to static routing.
         """
         meta = state.incident_metadata
+        assert meta is not None
         available = [tag.value for tag in self._registry]
 
         hint_text = ""
@@ -173,6 +174,7 @@ class LogExtractorAgent:
             "Choose the best connector and specify log paths, keywords, and time window."
         )
 
+        assert self._llm is not None
         response = self._llm.complete(
             messages=[{"role": "user", "content": user_content}],
             max_tokens=512,

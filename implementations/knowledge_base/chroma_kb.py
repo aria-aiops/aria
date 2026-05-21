@@ -113,7 +113,7 @@ class ChromaKnowledgeBase(KnowledgeBaseInterface):
                 continue
             name = meta.get("name", "")
             if name:
-                names.append(name.replace("_", "-"))
+                names.append(name.replace("_", "-"))  # type: ignore[union-attr]
         return names
 
     def get_log_hints(self, service: str, platform_tag: PlatformTag) -> LogAccessHint:
@@ -179,7 +179,7 @@ class ChromaKnowledgeBase(KnowledgeBaseInterface):
 
         if docs:
             try:
-                self._collection.add(documents=docs, ids=ids, metadatas=metadatas)
+                self._collection.add(documents=docs, ids=ids, metadatas=metadatas)  # type: ignore[arg-type]
                 logger.debug("ChromaKnowledgeBase: added %d new documents", len(docs))
             except Exception as exc:
                 raise KnowledgeBaseError(f"Failed to add documents to Chroma: {exc}") from exc
