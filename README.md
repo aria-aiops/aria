@@ -117,11 +117,13 @@ ServiceNow ──► Agent 0 (Orchestrator — LangGraph pipeline)
 
 Agents 2 and 3 form a **ReAct loop**: if the classifier determines the log evidence is insufficient, it signals Agent 2 to run an additional targeted query. The loop runs in-memory until the classifier has enough evidence or the iteration budget is exhausted.
 
-### Agent 0 — Orchestrator *(in progress)*
+### Agent 0 — Orchestrator ✅ Implemented
 
-**File**: `core/orchestrator/`
+**File**: `core/orchestrator/pipeline.py`
 
 The LangGraph pipeline that owns the shared `PipelineState` and coordinates the full run — launching Agent 1, threading state through each subsequent agent, managing the Agent 2 ↔ 3 ReAct loop, and surfacing errors. This is the only component that uses LangGraph; agents 1–4 are plain Python nodes composed by it.
+
+**Dry-run mode** (`ARIA_DRY_RUN=true`): all connectors are replaced with in-memory stubs — no ServiceNow, SSH, or Slack credentials required. Only `ARIA_AGENT1_MODEL` is needed (Agent 1 still calls the LLM for CI resolution).
 
 ### Agent 1 — Incident Reader ✅ Implemented
 
@@ -158,11 +160,13 @@ Time window: `opened_at − 30 min`. On empty result, retries once with a 60-min
 
 **Cloud stubs:** Databricks, AWS EMR, Azure Monitor — raise `NotImplementedError`, full implementations planned.
 
-### Agent 3 — Classifier *(in progress)*
+### Agent 3 — Classifier ✅ Stub (real classifier in M4)
 
 **File**: `core/agents/classifier.py`
 
 Uses an LLM with a few-shot prompt to classify the root cause and assign a mandatory confidence score. Error classes: `OOM`, `CPU`, `disk`, `network`, `auth`, `database`, `pipeline`, `unknown`. Confidence band (`high/medium/low`) is always surfaced in notifications — a low-confidence result is never presented as definitive.
+
+The stub (M6) always returns `error_class="unknown"` with `ConfidenceBand.LOW` and `pending_log_request=None`. M4 drops in the real LLM-based implementation as a direct swap.
 
 ### Agent 4 — Notifier ✅ Implemented
 
@@ -244,9 +248,9 @@ All responses are JSON. All errors use the same envelope — no HTML error pages
 |---|---|---|
 | Agent 1 — Incident Reader | `POST /api/v1/agent1/run` | ✅ Implemented |
 | Agent 2 — Log Extractor | `POST /api/v1/agent2/run` | ✅ Implemented |
-| Agent 3 — Classifier | `POST /api/v1/agent3/run` | 🔜 In progress |
+| Agent 3 — Classifier | `POST /api/v1/agent3/run` | 🔜 M4 (stub in pipeline) |
 | Agent 4 — Notifier | `POST /api/v1/agent4/run` | ✅ Implemented |
-| Agent 0 — Pipeline (full run) | `POST /api/v1/pipeline/run` | 🔜 In progress |
+| Agent 0 — Pipeline (full run) | `POST /api/v1/pipeline/run` | ✅ Implemented |
 
 See [documentation/aria_apis.md](documentation/aria_apis.md) for the full API specification including request/response schemas, error codes, and API mode configuration.
 
@@ -355,7 +359,8 @@ aria/
 │       ├── health.py
 │       ├── agent1.py          # ✅ POST /api/v1/agent1/run
 │       ├── agent2.py          # ✅ POST /api/v1/agent2/run
-│       └── agent4.py          # ✅ POST /api/v1/agent4/run
+│       ├── agent4.py          # ✅ POST /api/v1/agent4/run
+│       └── pipeline.py        # ✅ POST /api/v1/pipeline/run
 ├── core/                      # Pure Python, zero cloud dependencies
 │   ├── agents/                # Agent implementations
 │   ├── interfaces/            # ABCs: connector, log_store, llm_client, vault, knowledge_base, queue, state_store
@@ -452,7 +457,7 @@ Phase 1 is complete when all of the following pass on 10 consecutive test incide
 | Phase 1 | S5.5: LLM mode selector + Agent 2 optional LLM query planning (`LogQueryPlan`) | ✅ Done |
 | Phase 1 | M4: Agent 3 — LLM-based classifier with confidence scoring | 🔜 Planned |
 | Phase 1 | M5: Agent 4 — Notifier (Slack/Teams/Google Chat) | ✅ Done |
-| Phase 1 | M6: Orchestration + ReAct loop — full pipeline | 🔜 Planned |
+| Phase 1 | M6: Orchestration + ReAct loop — full pipeline | ✅ Done |
 | Phase 1 | M7: Acceptance testing — all 6 criteria passing | 🔜 Planned |
 | Phase 2 | Human validation gate + write-back to ServiceNow | 💡 Planned |
 | Phase 3 | Autonomous mode with auto-acknowledgement (MTTA impact) | 💡 Vision |
