@@ -160,13 +160,10 @@ class SSHLogConnector(LogStoreInterface):
             _load_known_host_key(client, host, host_key_pem)
             client.set_missing_host_key_policy(paramiko.RejectPolicy())
         else:
-            logger.warning(
-                "SSHLogConnector: no host_key_secret configured for %r — "
-                "host key verification disabled (MITM risk). "
-                "Set host_key_secret to enable strict verification.",
-                host,
+            raise ValueError(
+                f"SSHLogConnector: host_key_secret is required for {host!r}. "
+                "Set CDP_HOST_KEY (or the relevant host_key_secret) to enable the connector."
             )
-            client.set_missing_host_key_policy(paramiko.WarningPolicy())
         try:
             client.connect(
                 hostname=host,

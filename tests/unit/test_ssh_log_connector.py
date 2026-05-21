@@ -34,6 +34,7 @@ def _make_connector(**kwargs):
         vault=_make_vault(),
         ssh_key_secret="TEST_SSH_KEY",
         ssh_user="testuser",
+        host_key_secret="TEST_HOST_KEY",
         log_dirs=_LOG_DIRS,
     )
     defaults.update(kwargs)
@@ -68,9 +69,10 @@ def test_parse_line_invalid_returns_none():
 # ── SSHLogConnector ───────────────────────────────────────────────────────────
 
 
+@patch("implementations.clusters.onprem.log_connector._load_known_host_key")
 @patch("implementations.clusters.onprem.log_connector._load_private_key")
 @patch("implementations.clusters.onprem.log_connector.paramiko.SSHClient")
-def test_ssh_success_returns_log_lines(mock_ssh_cls, mock_load_key):
+def test_ssh_success_returns_log_lines(mock_ssh_cls, mock_load_key, mock_load_host_key):
     mock_load_key.return_value = MagicMock()
     mock_client = MagicMock()
     mock_ssh_cls.return_value = mock_client
@@ -89,9 +91,10 @@ def test_ssh_success_returns_log_lines(mock_ssh_cls, mock_load_key):
     assert result.confidence != ConfidenceBand.LOW
 
 
+@patch("implementations.clusters.onprem.log_connector._load_known_host_key")
 @patch("implementations.clusters.onprem.log_connector._load_private_key")
 @patch("implementations.clusters.onprem.log_connector.paramiko.SSHClient")
-def test_ssh_failure_returns_empty(mock_ssh_cls, mock_load_key):
+def test_ssh_failure_returns_empty(mock_ssh_cls, mock_load_key, mock_load_host_key):
     mock_load_key.return_value = MagicMock()
     mock_client = MagicMock()
     mock_ssh_cls.return_value = mock_client
@@ -104,9 +107,10 @@ def test_ssh_failure_returns_empty(mock_ssh_cls, mock_load_key):
     assert result.total_scanned == 0
 
 
+@patch("implementations.clusters.onprem.log_connector._load_known_host_key")
 @patch("implementations.clusters.onprem.log_connector._load_private_key")
 @patch("implementations.clusters.onprem.log_connector.paramiko.SSHClient")
-def test_time_window_filtering(mock_ssh_cls, mock_load_key):
+def test_time_window_filtering(mock_ssh_cls, mock_load_key, mock_load_host_key):
     mock_load_key.return_value = MagicMock()
     mock_client = MagicMock()
     mock_ssh_cls.return_value = mock_client
@@ -124,9 +128,12 @@ def test_time_window_filtering(mock_ssh_cls, mock_load_key):
     assert "in-window" in result.log_lines[0].message
 
 
+@patch("implementations.clusters.onprem.log_connector._load_known_host_key")
 @patch("implementations.clusters.onprem.log_connector._load_private_key")
 @patch("implementations.clusters.onprem.log_connector.paramiko.SSHClient")
-def test_uses_constructor_log_dirs_when_no_log_paths(mock_ssh_cls, mock_load_key):
+def test_uses_constructor_log_dirs_when_no_log_paths(
+    mock_ssh_cls, mock_load_key, mock_load_host_key
+):
     mock_load_key.return_value = MagicMock()
     mock_client = MagicMock()
     mock_ssh_cls.return_value = mock_client
@@ -150,9 +157,10 @@ def test_no_log_dirs_returns_empty():
     assert result.confidence == ConfidenceBand.LOW
 
 
+@patch("implementations.clusters.onprem.log_connector._load_known_host_key")
 @patch("implementations.clusters.onprem.log_connector._load_private_key")
 @patch("implementations.clusters.onprem.log_connector.paramiko.SSHClient")
-def test_uses_provided_keywords_in_grep(mock_ssh_cls, mock_load_key):
+def test_uses_provided_keywords_in_grep(mock_ssh_cls, mock_load_key, mock_load_host_key):
     mock_load_key.return_value = MagicMock()
     mock_client = MagicMock()
     mock_ssh_cls.return_value = mock_client
@@ -167,9 +175,10 @@ def test_uses_provided_keywords_in_grep(mock_ssh_cls, mock_load_key):
     assert "FATAL" in cmd
 
 
+@patch("implementations.clusters.onprem.log_connector._load_known_host_key")
 @patch("implementations.clusters.onprem.log_connector._load_private_key")
 @patch("implementations.clusters.onprem.log_connector.paramiko.SSHClient")
-def test_error_before_warn_in_output(mock_ssh_cls, mock_load_key):
+def test_error_before_warn_in_output(mock_ssh_cls, mock_load_key, mock_load_host_key):
     mock_load_key.return_value = MagicMock()
     mock_client = MagicMock()
     mock_ssh_cls.return_value = mock_client
@@ -187,9 +196,10 @@ def test_error_before_warn_in_output(mock_ssh_cls, mock_load_key):
     assert result.log_lines[1].level == "WARN"
 
 
+@patch("implementations.clusters.onprem.log_connector._load_known_host_key")
 @patch("implementations.clusters.onprem.log_connector._load_private_key")
 @patch("implementations.clusters.onprem.log_connector.paramiko.SSHClient")
-def test_max_results_truncation(mock_ssh_cls, mock_load_key):
+def test_max_results_truncation(mock_ssh_cls, mock_load_key, mock_load_host_key):
     mock_load_key.return_value = MagicMock()
     mock_client = MagicMock()
     mock_ssh_cls.return_value = mock_client
@@ -209,9 +219,9 @@ def test_vault_key_name_used():
     vault = _make_vault()
     connector = _make_connector(vault=vault, ssh_key_secret="MY_CLUSTER_KEY")
 
-    with patch("implementations.clusters.onprem.log_connector._load_private_key"), patch(
-        "implementations.clusters.onprem.log_connector.paramiko.SSHClient"
-    ) as mock_ssh_cls:
+    with patch("implementations.clusters.onprem.log_connector._load_known_host_key"), patch(
+        "implementations.clusters.onprem.log_connector._load_private_key"
+    ), patch("implementations.clusters.onprem.log_connector.paramiko.SSHClient") as mock_ssh_cls:
         mock_client = MagicMock()
         mock_ssh_cls.return_value = mock_client
         stdout = MagicMock()
@@ -220,4 +230,4 @@ def test_vault_key_name_used():
 
         connector.query_logs(_HOST, PlatformTag.CDP, _START, _END)
 
-    vault.get_secret.assert_called_once_with("MY_CLUSTER_KEY")
+    vault.get_secret.assert_any_call("MY_CLUSTER_KEY")
