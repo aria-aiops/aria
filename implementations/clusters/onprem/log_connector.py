@@ -128,7 +128,9 @@ class SSHLogConnector(LogStoreInterface):
                 continue
             log_lines.append(ll)
 
-        log_lines.sort(key=lambda line: (_LEVEL_PRIORITY.get(line.level.upper(), 99), line.timestamp))
+        log_lines.sort(
+            key=lambda line: (_LEVEL_PRIORITY.get(line.level.upper(), 99), line.timestamp)
+        )
         total = len(log_lines)
         log_lines = log_lines[:max_results]
 

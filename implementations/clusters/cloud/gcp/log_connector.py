@@ -102,7 +102,9 @@ class GCPLogConnector(LogStoreInterface):
             )
 
         log_lines = [ll for e in entries if (ll := _entry_to_log_line(e, host)) is not None]
-        log_lines.sort(key=lambda line: (_LEVEL_PRIORITY.get(line.level.upper(), 99), line.timestamp))
+        log_lines.sort(
+            key=lambda line: (_LEVEL_PRIORITY.get(line.level.upper(), 99), line.timestamp)
+        )
         total = len(log_lines)
         log_lines = log_lines[:max_results]
 

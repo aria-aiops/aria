@@ -150,7 +150,9 @@ def test_cdp_yarn_returns_oom_errors():
     assert result_state.error is None
     log_lines = result_state.log_result.log_lines
     assert any(line.level == "ERROR" for line in log_lines)
-    assert any("OutOfMemoryError" in line.message or "memory" in line.message.lower() for line in log_lines)
+    assert any(
+        "OutOfMemoryError" in line.message or "memory" in line.message.lower() for line in log_lines
+    )
 
 
 def test_unknown_platform_returns_empty_without_crash():
