@@ -160,6 +160,31 @@ class Agent4Response(AgentResponse):
     data: Agent4Data | None = None
 
 
+# ── Pipeline ───────────────────────────────────────────────────────────────────
+
+
+class PipelineRunRequest(BaseModel):
+    incident_number: str
+
+
+class PipelineData(BaseModel):
+    incident_number: str
+    classification_label: str | None
+    confidence_band: str | None  # "high" | "medium" | "low"
+    confidence_score: float | None
+    affected_ci: str | None
+    platform: str | None
+    notification_sent: bool
+    loop_iterations: int
+    is_partial: bool
+    error: str | None
+
+
+class PipelineResponse(AgentResponse):
+    agent: str = "pipeline"
+    data: PipelineData | None = None
+
+
 # ── Global health ──────────────────────────────────────────────────────────────
 
 
