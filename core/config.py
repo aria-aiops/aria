@@ -108,6 +108,25 @@ def cdp_ssh_user() -> str:
     return _get(["cdp", "ssh_user"], "CDP_SSH_USER", "hadoop")
 
 
+def cdp_log_dirs() -> list[str]:
+    """Return directories to search for logs on CDP cluster nodes.
+
+    Reads cdp.log_dirs from conf.yaml (list of strings). Falls back to the
+    standard Hadoop log paths if not configured.
+    """
+    cfg = _raw()
+    dirs = cfg.get("cdp", {}).get("log_dirs")
+    if isinstance(dirs, list) and dirs:
+        return [str(d) for d in dirs]
+    return [
+        "/var/log/hadoop-hdfs",
+        "/var/log/hadoop-yarn",
+        "/var/log/hive",
+        "/var/log/oozie",
+        "/var/log/spark",
+    ]
+
+
 # ── Slack ─────────────────────────────────────────────────────────────────────
 
 
