@@ -463,7 +463,7 @@ Phase 1 is complete when all of the following pass on 10 consecutive test incide
 | Phase 1 | M4: Agent 3 — LLM-based classifier with confidence scoring | ✅ Done |
 | Phase 1 | M5: Agent 4 — Notifier (Slack/Teams/Google Chat) | ✅ Done |
 | Phase 1 | M6: Orchestration + ReAct loop — full pipeline | ✅ Done |
-| Phase 1 | M7: Acceptance testing — all 6 criteria passing | 🔜 Planned |
+| Phase 1 | M7: Acceptance testing — all 6 criteria passing | 🔄 In progress |
 | Phase 2 | Human validation gate + write-back to ServiceNow | 💡 Planned |
 | Phase 3 | Autonomous mode with auto-acknowledgement (MTTA impact) | 💡 Vision |
 
