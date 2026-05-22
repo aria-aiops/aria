@@ -20,7 +20,7 @@ from core.orchestrator.pipeline import ARIAPipeline
 from implementations.clusters.cloud.gcp.log_connector import GCPLogConnector
 from implementations.clusters.onprem.log_connector import SSHLogConnector
 from implementations.itsm.servicenow.connector import ServiceNowConnector
-from implementations.llm.anthropic.llm_client import AnthropicLLMClient
+from implementations.llm.claude_code.llm_client import ClaudeCodeLLMClient as LLMClient
 from implementations.vault.envvar import EnvVarVault
 
 
@@ -33,7 +33,7 @@ def _resolve_model(agent_num: str) -> str | None:
 def get_agent1() -> IncidentReaderAgent:
     """Build and cache the Agent 1 (Incident Reader) instance.
 
-    Injects ServiceNow connector, Anthropic LLM client, and optionally the
+    Injects ServiceNow connector, Claude Code LLM client, and optionally the
     CMDBResolver when SNOW credentials are present. CMDBResolver absence is
     non-fatal — Agent 1 falls back to Path 3 (LLM-only) for CI resolution.
 
@@ -46,7 +46,7 @@ def get_agent1() -> IncidentReaderAgent:
         raise ValueError(
             "ARIA_AGENT1_MODEL env var is not set (or ARIA_GLOBAL_MODEL when ARIA_LLM_MODE=global)"
         )
-    llm = AnthropicLLMClient(model=model)
+    llm = LLMClient(model=model)
 
     # Inject CMDBResolver when SNOW vars are present — enables Path 1 and Path 2
     # CI resolution. Without it, every incident falls through to Path 3 (LLM).
@@ -74,7 +74,7 @@ def get_agent3() -> ClassifierAgent:
             "ARIA_AGENT3_MODEL env var is not set "
             "(or ARIA_GLOBAL_MODEL when ARIA_LLM_MODE=global)"
         )
-    return ClassifierAgent(llm_client=AnthropicLLMClient(model=model))
+    return ClassifierAgent(llm_client=LLMClient(model=model))
 
 
 @lru_cache(maxsize=1)
@@ -93,7 +93,7 @@ def get_agent4() -> NotifierAgent:
     llm = None
     model = cfg.llm_agent_model("4")
     if model:
-        llm = AnthropicLLMClient(model=model)
+        llm = LLMClient(model=model)
 
     return NotifierAgent(
         communicator=SlackConnector(token=token, channel_id=channel),
@@ -124,7 +124,7 @@ def get_pipeline() -> "ARIAPipeline":
             )
         agent1 = IncidentReaderAgent(
             connector=InMemoryConnector(fixture_path=Path("tests/fixtures/sample_incidents.json")),
-            llm_client=AnthropicLLMClient(model=model1),
+            llm_client=LLMClient(model=model1),
         )
         agent2 = LogExtractorAgent(
             connector_registry={
@@ -139,7 +139,7 @@ def get_pipeline() -> "ARIAPipeline":
         agent1 = get_agent1()
         agent2 = get_agent2()
         model3 = _resolve_model("3")
-        agent3 = ClassifierAgent(llm_client=AnthropicLLMClient(model=model3) if model3 else None)
+        agent3 = ClassifierAgent(llm_client=LLMClient(model=model3) if model3 else None)
         agent4 = get_agent4()
 
     return ARIAPipeline(agent1, agent2, agent3, agent4)
@@ -171,5 +171,5 @@ def get_agent2() -> LogExtractorAgent:
     llm = None
     model = _resolve_model("2")
     if model:
-        llm = AnthropicLLMClient(model=model)
+        llm = LLMClient(model=model)
     return LogExtractorAgent(connector_registry=registry, llm_client=llm)
