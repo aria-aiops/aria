@@ -25,11 +25,21 @@ from implementations.vault.envvar import EnvVarVault
 
 
 def _resolve_model(agent_num: str) -> str | None:
+    """Thin wrapper around cfg.resolve_model for use inside this module."""
     return cfg.resolve_model(agent_num)
 
 
 @lru_cache(maxsize=1)
 def get_agent1() -> IncidentReaderAgent:
+    """Build and cache the Agent 1 (Incident Reader) instance.
+
+    Injects ServiceNow connector, Anthropic LLM client, and optionally the
+    CMDBResolver when SNOW credentials are present. CMDBResolver absence is
+    non-fatal — Agent 1 falls back to Path 3 (LLM-only) for CI resolution.
+
+    Raises:
+        ValueError: If ARIA_AGENT1_MODEL (or ARIA_GLOBAL_MODEL) is not configured.
+    """
     connector = ServiceNowConnector()
     model = _resolve_model("1")
     if not model:
@@ -52,7 +62,28 @@ def get_agent1() -> IncidentReaderAgent:
 
 
 @lru_cache(maxsize=1)
+def get_agent3() -> ClassifierAgent:
+    """Build and cache the Agent 3 (Classifier) instance.
+
+    Raises:
+        ValueError: If ARIA_AGENT3_MODEL (or ARIA_GLOBAL_MODEL) is not configured.
+    """
+    model = _resolve_model("3")
+    if not model:
+        raise ValueError(
+            "ARIA_AGENT3_MODEL env var is not set "
+            "(or ARIA_GLOBAL_MODEL when ARIA_LLM_MODE=global)"
+        )
+    return ClassifierAgent(llm_client=AnthropicLLMClient(model=model))
+
+
+@lru_cache(maxsize=1)
 def get_agent4() -> NotifierAgent:
+    """Build and cache the Agent 4 (Notifier) instance with a Slack communicator.
+
+    Raises:
+        ValueError: If SLACK_BOT_TOKEN or SLACK_CHANNEL_ID is not set.
+    """
     token = os.environ.get("SLACK_BOT_TOKEN")
     channel = cfg.slack_channel_id()
     if not token or not channel:
@@ -116,6 +147,13 @@ def get_pipeline() -> "ARIAPipeline":
 
 @lru_cache(maxsize=1)
 def get_agent2() -> LogExtractorAgent:
+    """Build and cache the Agent 2 (Log Extractor) instance.
+
+    Registers CDP (SSH) and GCP (Cloud Logging) connectors. Missing credentials
+    are non-fatal at construction — connectors resolve secrets at query time
+    and return empty results gracefully if credentials are absent.
+    Injects an LLM client for query planning if ARIA_AGENT2_MODEL is set.
+    """
     vault = EnvVarVault()
     # Both connectors call vault.get_secret() only at query time — construction
     # never fails. Missing credentials surface as graceful empty results at
