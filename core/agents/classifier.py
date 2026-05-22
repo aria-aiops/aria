@@ -15,7 +15,7 @@ from typing import Any
 
 from core.exceptions import ClassificationError
 from core.interfaces.llm_client import LLMClientInterface
-from core.models import ClassificationResult, ConfidenceBand, PipelineState
+from core.models import ClassificationResult, ConfidenceBand, LogRequest, PipelineState
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +33,8 @@ Return ONLY valid JSON — no markdown, no code fences, no explanation:
   "error_label": "<concise human-readable label, max 10 words>",
   "confidence": <float 0.0-1.0>,
   "supporting_evidence": ["<direct evidence from logs or metadata>", ...],
-  "recommended_actions": ["<concrete actionable step>", ...]
+  "recommended_actions": ["<concrete actionable step>", ...],
+  "log_request": null | {"request": "<description naming the server/service exactly as it appears in the logs>", "priority": "high"|"medium"}
 }
 
 Rules:
@@ -41,6 +42,12 @@ Rules:
 - Use confidence >= 0.7 only when evidence is clear and unambiguous
 - supporting_evidence must reference specific log lines or metadata facts
 - recommended_actions must be concrete operational steps
+- log_request: set this ONLY when the log lines explicitly name a different server or service as the root cause
+  (e.g. a DataNode log references a NameNode hostname, or a HiveServer2 log references a DataNode).
+  The request string must include that server/service name exactly as it appears in the log lines.
+  If you can classify from the current evidence — even at low confidence — set log_request to null and classify normally.
+  Do NOT set log_request out of general uncertainty; only set it when a specific cross-service host is named in the logs.
+  When log_request is non-null, set error_class to "unknown" and confidence to 0.0.
 """
 
 
@@ -71,7 +78,10 @@ class ClassifierAgent:
                    Agents 1 and 2. Both may be None (e.g. earlier agent failed).
 
         Returns:
-            Updated state with classification populated and pending_log_request cleared.
+            Updated state. On a normal classification: classification is set and
+            pending_log_request is cleared. On a cross-service log request: classification
+            remains None and pending_log_request is set for the orchestrator to route
+            back to Agent 2.
 
         Raises:
             ClassificationError: If the LLM call fails or its response cannot be parsed.
@@ -109,7 +119,7 @@ class ClassifierAgent:
             raise ClassificationError(f"LLM call failed: {exc}") from exc
 
         try:
-            classification = self._parse_response(raw)
+            classification, log_request = self._parse_response(raw)
         except ClassificationError:
             raise
         except Exception as exc:
@@ -117,6 +127,15 @@ class ClassifierAgent:
                 "classifier: unexpected parse error for %s: %s", state.incident_number, exc
             )
             raise ClassificationError(f"Unexpected parse error: {exc}") from exc
+
+        if log_request is not None:
+            logger.info(
+                "classifier: requesting cross-service logs for %s: %r",
+                state.incident_number,
+                log_request.request,
+            )
+            state.pending_log_request = log_request
+            return state
 
         state.classification = classification
         state.pending_log_request = None
@@ -160,18 +179,21 @@ class ClassifierAgent:
         )
         return [{"role": "user", "content": content}]
 
-    def _parse_response(self, raw: str) -> ClassificationResult:
-        """Parse the LLM's raw JSON response into a ClassificationResult.
+    def _parse_response(self, raw: str) -> tuple[ClassificationResult | None, LogRequest | None]:
+        """Parse the LLM's raw JSON response into either a classification or a log request.
 
-        Validates that all required fields are present. Normalises error_class to
-        lowercase and falls back to 'unknown' if the value is not in the allowed set.
-        confidence_band is derived from the confidence float — never trusted from the LLM.
+        When the response contains a non-null log_request field, Agent 3 is signalling
+        that it needs logs from a different service before it can classify. In that case
+        returns (None, LogRequest). Otherwise returns (ClassificationResult, None).
+
+        confidence_band is always derived from the confidence float — never trusted from LLM.
 
         Args:
             raw: Raw text returned by the LLM. Expected to be a JSON object.
 
         Returns:
-            A fully populated ClassificationResult.
+            (ClassificationResult, None) for a normal classification.
+            (None, LogRequest) when a cross-service log fetch is needed.
 
         Raises:
             ClassificationError: If the JSON is invalid or required fields are missing.
@@ -193,6 +215,15 @@ class ClassifierAgent:
         if missing:
             raise ClassificationError(f"LLM response missing fields: {missing}")
 
+        # Cross-service log request — Agent 3 needs more evidence before classifying.
+        raw_log_request = data.get("log_request")
+        if isinstance(raw_log_request, dict) and raw_log_request.get("request"):
+            log_request = LogRequest(
+                request=str(raw_log_request["request"]),
+                priority=str(raw_log_request.get("priority", "medium")),
+            )
+            return None, log_request
+
         error_class = str(data["error_class"]).lower()
         if error_class not in _VALID_ERROR_CLASSES:
             logger.warning(
@@ -207,13 +238,16 @@ class ClassifierAgent:
 
         confidence = max(0.0, min(1.0, confidence))
 
-        return ClassificationResult(
-            error_class=error_class,
-            error_label=str(data["error_label"]),
-            confidence=confidence,
-            confidence_band=self._band_from_score(confidence),
-            supporting_evidence=list(data.get("supporting_evidence") or []),
-            recommended_actions=list(data.get("recommended_actions") or []),
+        return (
+            ClassificationResult(
+                error_class=error_class,
+                error_label=str(data["error_label"]),
+                confidence=confidence,
+                confidence_band=self._band_from_score(confidence),
+                supporting_evidence=list(data.get("supporting_evidence") or []),
+                recommended_actions=list(data.get("recommended_actions") or []),
+            ),
+            None,
         )
 
     @staticmethod

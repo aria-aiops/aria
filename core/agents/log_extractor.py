@@ -39,6 +39,7 @@ from core.models import (
     LogLine,
     LogQueryPlan,
     LogQueryResult,
+    LogRequest,
     PipelineState,
     PlatformTag,
 )
@@ -66,6 +67,7 @@ class LogExtractorAgent:
         connector_registry: dict[PlatformTag, LogStoreInterface],
         knowledge_base: KnowledgeBaseInterface | None = None,
         llm_client: LLMClientInterface | None = None,
+        cluster_hosts: dict[str, str] | None = None,
     ) -> None:
         """Initialise Agent 2 with its connector registry and optional dependencies.
 
@@ -76,10 +78,13 @@ class LogExtractorAgent:
                             to retrieve log paths and keywords for a service.
             llm_client: Optional LLM client for query planning (ARI-74/75). When None,
                         Agent 2 falls back to static platform_tag-based routing.
+            cluster_hosts: CI name → IP mapping used to resolve cross-service log requests
+                           from the ReAct loop. When None, cross-service fetches are skipped.
         """
         self._registry = connector_registry
         self._kb = knowledge_base
         self._llm = llm_client
+        self._cluster_hosts: dict[str, str] = cluster_hosts or {}
 
     def run(self, state: PipelineState) -> PipelineState:
         """Run log extraction for the incident in the current pipeline state.
@@ -98,6 +103,10 @@ class LogExtractorAgent:
         if not state.incident_metadata:
             state.error = "Agent 2: no incident metadata in pipeline state"
             return state
+
+        # ReAct loop re-entry: Agent 3 requested logs from a different service.
+        if state.pending_log_request is not None:
+            return self._run_for_log_request(state, state.pending_log_request)
 
         meta = state.incident_metadata
 
@@ -323,6 +332,89 @@ class LogExtractorAgent:
             total_scanned=total_scanned,
             confidence=confidence,
         )
+
+    def _resolve_ci_from_request(self, request: str) -> tuple[str, str] | None:
+        """Find the first CI name from cluster_hosts that appears in the request string.
+
+        Agent 3 embeds the server name exactly as it appeared in the log lines, so a
+        substring check against the known CI name list is sufficient and avoids an
+        extra LLM call.
+
+        Args:
+            request: Natural-language request string from Agent 3's log_request.
+
+        Returns:
+            (ci_name, ip) for the first match, or None if no known CI is named.
+        """
+        for ci_name, ip in self._cluster_hosts.items():
+            if ci_name in request:
+                return ci_name, ip
+        return None
+
+    def _run_for_log_request(self, state: PipelineState, log_request: LogRequest) -> PipelineState:
+        """Handle a ReAct loop re-entry: fetch logs for the cross-service target named in the request.
+
+        Resolves the CI name in the request string to an IP via cluster_hosts, fetches
+        logs from that host using the existing _extract() path, and merges the new lines
+        with the log_result already in state so Agent 3 sees all evidence on the next pass.
+
+        If the request names an unknown host, a warning is logged and state is returned
+        unchanged — Agent 2's node wrapper will clear pending_log_request regardless, so
+        the loop terminates cleanly.
+
+        Args:
+            state: Current pipeline state. incident_metadata must be set.
+            log_request: The cross-service fetch request from Agent 3.
+
+        Returns:
+            Updated state with log_result merged (or unchanged on unresolvable CI).
+        """
+        meta = state.incident_metadata
+        assert meta is not None
+
+        resolved = self._resolve_ci_from_request(log_request.request)
+        if resolved is None:
+            logger.warning(
+                "Agent 2: cannot resolve CI from log_request %r — skipping cross-service fetch",
+                log_request.request,
+            )
+            return state
+
+        ci_name, ip = resolved
+        logger.info(
+            "Agent 2: cross-service fetch for %s — CI %r resolved to %s",
+            state.incident_number,
+            ci_name,
+            ip,
+        )
+
+        new_result = self._extract(meta, ip)
+
+        # Merge new lines with existing log_result so Agent 3 has all evidence.
+        existing = state.log_result
+        if existing is None:
+            state.log_result = new_result
+            return state
+
+        combined_lines = sorted(
+            existing.log_lines + new_result.log_lines,
+            key=lambda ll: ll.timestamp,
+        )
+        combined_scanned = existing.total_scanned + new_result.total_scanned
+        if combined_scanned >= 10:
+            confidence = ConfidenceBand.HIGH
+        elif combined_scanned > 0:
+            confidence = ConfidenceBand.MEDIUM
+        else:
+            confidence = ConfidenceBand.LOW
+
+        state.log_result = LogQueryResult(
+            log_lines=combined_lines[:50],
+            query_executed=f"{existing.query_executed} + {new_result.query_executed}",
+            total_scanned=combined_scanned,
+            confidence=confidence,
+        )
+        return state
 
     def _query(
         self,

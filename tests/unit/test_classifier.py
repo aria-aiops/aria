@@ -221,3 +221,56 @@ def test_classification_on_empty_state_no_crash() -> None:
     result = agent.run(state)
 
     assert result.classification is not None
+
+
+# ── ReAct loop trigger tests ───────────────────────────────────────────────────
+
+
+def _loop_trigger_response(target: str = "cdp-nn-02") -> dict:
+    """Build a response where Agent 3 requests cross-service logs before classifying."""
+    return {
+        "error_class": "unknown",
+        "error_label": "Insufficient evidence — cross-service logs required",
+        "confidence": 0.0,
+        "supporting_evidence": [f"DataNode log references {target}"],
+        "recommended_actions": [],
+        "log_request": {
+            "request": f"Fetch NameNode logs from {target} — crash indicated in DataNode heartbeat loss",
+            "priority": "high",
+        },
+    }
+
+
+def test_log_request_sets_pending_log_request_and_clears_classification() -> None:
+    """LLM response with non-null log_request → pending_log_request set, classification None."""
+    from core.models import LogRequest
+
+    agent = ClassifierAgent(llm_client=_mock_llm(_loop_trigger_response("cdp-nn-02")))
+    state = agent.run(_make_state())
+
+    assert state.pending_log_request is not None
+    assert isinstance(state.pending_log_request, LogRequest)
+    assert "cdp-nn-02" in state.pending_log_request.request
+    assert state.pending_log_request.priority == "high"
+    assert state.classification is None
+
+
+def test_log_request_null_in_response_classifies_normally() -> None:
+    """LLM response with log_request explicitly null → normal classification, pending cleared."""
+    response = {**_oom_response(), "log_request": None}
+    agent = ClassifierAgent(llm_client=_mock_llm(response))
+    state = agent.run(_make_state())
+
+    assert state.classification is not None
+    assert state.classification.error_class == "oom"
+    assert state.pending_log_request is None
+
+
+def test_log_request_field_absent_classifies_normally() -> None:
+    """LLM response with no log_request key (legacy format) → normal classification."""
+    agent = ClassifierAgent(llm_client=_mock_llm(_oom_response()))
+    state = agent.run(_make_state())
+
+    assert state.classification is not None
+    assert state.classification.error_class == "oom"
+    assert state.pending_log_request is None
