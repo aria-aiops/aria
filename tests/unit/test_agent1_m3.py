@@ -8,6 +8,7 @@ from core.models import AffectedResource, CIClass, IncidentMetadata, PipelineSta
 
 
 def _make_metadata(**kwargs) -> IncidentMetadata:
+    """Build an IncidentMetadata with sensible defaults, overriding any supplied kwargs."""
     defaults = dict(
         incident_number="INC001",
         caller="jdoe",
@@ -31,6 +32,7 @@ def _make_agent(
     ci_ip=None,  # returned by cmdb.get_ip
     parent_cluster=None,
 ):
+    """Build an IncidentReaderAgent with fully mocked dependencies, configurable per-test."""
     connector = MagicMock()
     llm = MagicMock()
     cmdb = MagicMock()
@@ -48,7 +50,10 @@ def _make_agent(
 
 
 class TestPath1ServiceNode:
+    """Path 1: CI is a SERVICE or NODE — metadata passes through with optional IP enrichment."""
+
     def test_service_ci_passes_through_unchanged(self):
+        """Verify that a SERVICE CI is not modified and populates affected_resources with itself."""
         agent = _make_agent(ci_class=CIClass.SERVICE)
         metadata = _make_metadata(affected_ci="hive-metastore")
         agent._connector.read_incident.return_value = metadata
@@ -60,6 +65,7 @@ class TestPath1ServiceNode:
         assert state.incident_metadata.affected_resources == [AffectedResource("hive-metastore")]
 
     def test_node_ci_passes_through_unchanged(self):
+        """Verify that a NODE CI passes through with its ci_class correctly set."""
         agent = _make_agent(ci_class=CIClass.NODE)
         metadata = _make_metadata(affected_ci="worker-01")
         agent._connector.read_incident.return_value = metadata
@@ -70,6 +76,7 @@ class TestPath1ServiceNode:
         assert state.incident_metadata.ci_class == CIClass.NODE
 
     def test_path1_resolves_ip_from_cmdb(self):
+        """Verify that Path 1 resolves a NODE CI to its IP and attaches it to the resource."""
         agent = _make_agent(ci_class=CIClass.NODE, ci_ip="10.0.1.5")
         agent._connector.read_incident.return_value = _make_metadata(affected_ci="worker-01")
 
@@ -81,6 +88,7 @@ class TestPath1ServiceNode:
         ]
 
     def test_path1_does_not_call_kb(self):
+        """Verify that Path 1 never queries the knowledge base."""
         agent = _make_agent(ci_class=CIClass.SERVICE)
         agent._connector.read_incident.return_value = _make_metadata(affected_ci="hive")
 
@@ -109,6 +117,7 @@ class TestPath1ServiceNode:
         assert "worker-01" in names
 
     def test_path1_does_not_add_sibling_absent_from_description(self):
+        """Verify that CMDB siblings not mentioned in the description are excluded."""
         sibling = AffectedResource("worker-02")
         agent = _make_agent(
             ci_class=CIClass.NODE,
@@ -128,6 +137,8 @@ class TestPath1ServiceNode:
 
 
 class TestPath2Cluster:
+    """Path 2: CI is a CLUSTER — LLM extracts a component name validated against CMDB/KB."""
+
     def test_single_cmdb_member_match_sets_affected_ci(self):
         """LLM extracts a name that matches a CMDB member → single affected_ci."""
         nodes = [
@@ -179,6 +190,7 @@ class TestPath2Cluster:
         assert "worker-02" in names
 
     def test_ci_class_remains_cluster(self):
+        """Verify that ci_class is preserved as CLUSTER after Path 2 resolution."""
         agent = _make_agent(ci_class=CIClass.CLUSTER, hints=["yarn-resourcemanager"])
         agent._connector.read_incident.return_value = _make_metadata()
 
@@ -224,7 +236,10 @@ class TestPath2Cluster:
 
 
 class TestPath3Unknown:
+    """Path 3: CI class is UNKNOWN — LLM enrichment is used to infer affected_ci."""
+
     def test_no_ci_triggers_llm_enrichment(self):
+        """Verify that a missing affected_ci triggers LLM enrichment and populates affected_ci."""
         agent = _make_agent()
         agent._llm.complete.return_value = (
             '{"affected_ci": "worker-03", "platform_tag": "cdp", "confidence": "medium"}'
@@ -237,6 +252,7 @@ class TestPath3Unknown:
         assert state.incident_metadata.ci_class == CIClass.UNKNOWN
 
     def test_llm_failure_returns_partial_metadata(self):
+        """Verify that an LLM error leaves incident_metadata intact with no pipeline error."""
         agent = _make_agent()
         agent._llm.complete.side_effect = Exception("LLM unavailable")
         agent._connector.read_incident.return_value = _make_metadata(affected_ci=None)
@@ -248,7 +264,10 @@ class TestPath3Unknown:
 
 
 class TestConnectorFailure:
+    """Verify graceful degradation when the ITSM connector itself is unavailable."""
+
     def test_connector_error_sets_state_error(self):
+        """Verify that a connector exception sets state.error and leaves incident_metadata None."""
         agent = _make_agent()
         agent._connector.read_incident.side_effect = Exception("SNOW unreachable")
 

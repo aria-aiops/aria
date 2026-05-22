@@ -42,6 +42,7 @@ _YARN_FIXTURE = _FIXTURES_DIR / "yarn_resourcemanager.jsonl"
 
 
 def _load_fixture(path: Path) -> list[LogLine]:
+    """Load LogLine objects from a JSONL fixture file."""
     lines = []
     for raw in path.read_text().splitlines():
         raw = raw.strip()
@@ -102,6 +103,7 @@ def _make_state(
     opened_at: datetime,
     incident_number: str = "INC0010099",
 ) -> PipelineState:
+    """Build a PipelineState with IncidentMetadata for use in log extractor integration tests."""
     meta = IncidentMetadata(
         incident_number=incident_number,
         caller="test_user",
@@ -138,7 +140,7 @@ def test_cdp_hdfs_routes_to_fixture_connector():
 
 
 def test_cdp_yarn_returns_oom_errors():
-    """YARN OOM fixture is loaded and ERROR lines are present in result."""
+    """Verify that the YARN OOM fixture is loaded and ERROR lines are present in the result."""
     opened_at = datetime(2026, 4, 16, 3, 40)  # centre of the OOM window
     state = _make_state(PlatformTag.CDP, "cdp-rm-01", opened_at)
 
@@ -193,7 +195,7 @@ def test_extended_window_retry_on_empty_primary():
 
 
 def test_no_incident_metadata_sets_error():
-    """State without incident metadata causes Agent 2 to set state.error."""
+    """Verify that a state without incident metadata causes Agent 2 to set state.error."""
     state = PipelineState(incident_number="INC0000000")
 
     agent = LogExtractorAgent(
@@ -240,7 +242,7 @@ def llm_client_for_agent2():
 
 
 def _make_cdp_oom_state() -> PipelineState:
-    """Synthetic CDP NameNode OOM incident aligned with the HDFS fixture window."""
+    """Build a synthetic CDP NameNode OOM PipelineState whose opened_at aligns with the HDFS fixture window."""
     meta = IncidentMetadata(
         incident_number="INC0099001",
         caller="ops",

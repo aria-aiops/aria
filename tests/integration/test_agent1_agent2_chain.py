@@ -98,9 +98,10 @@ def _refresh_log_timestamps() -> None:
 
 
 class _NoLLM:
-    """Raises AssertionError if called — confirms Paths 1/2 don't invoke the LLM."""
+    """Stub LLM that raises AssertionError if called — confirms Paths 1/2 never invoke enrichment."""
 
-    def complete(self, *args, **kwargs):
+    def complete(self, *args, **kwargs) -> str:
+        """Raise AssertionError to signal that the LLM was unexpectedly invoked."""
         raise AssertionError("LLM was unexpectedly called — Paths 1 and 2 should not reach _enrich")
 
 

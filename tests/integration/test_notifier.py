@@ -46,6 +46,7 @@ def agent4(slack_connector):
 
 
 def _full_state() -> PipelineState:
+    """Build a fully populated PipelineState for a HIGH-confidence OOM incident."""
     state = PipelineState(incident_number="INC-ARIA-TEST-001")
     state.incident_metadata = IncidentMetadata(
         incident_number="INC-ARIA-TEST-001",
@@ -90,6 +91,7 @@ def _full_state() -> PipelineState:
 
 
 def _partial_state() -> PipelineState:
+    """Build a PipelineState with metadata but no classification, for partial notification tests."""
     state = PipelineState(incident_number="INC-ARIA-TEST-002")
     state.incident_metadata = IncidentMetadata(
         incident_number="INC-ARIA-TEST-002",
@@ -108,6 +110,7 @@ def _partial_state() -> PipelineState:
 
 
 def test_full_notification_sent_to_slack(agent4):
+    """Verify that a fully populated state results in a successful notification to Slack."""
     state = _full_state()
     result = agent4.run(state)
 
@@ -116,6 +119,7 @@ def test_full_notification_sent_to_slack(agent4):
 
 
 def test_partial_notification_sent_to_slack(agent4):
+    """Verify that a state without classification results in a partial notification to Slack."""
     state = _partial_state()
     result = agent4.run(state)
 

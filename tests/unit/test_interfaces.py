@@ -47,8 +47,10 @@ def state_store():
 
 
 class TestInMemoryConnector:
+    """Verify that InMemoryConnector honours the ConnectorInterface contract."""
 
     def test_read_incident_returns_correct_metadata(self, connector):
+        """Verify that read_incident returns a fully populated IncidentMetadata for a known ID."""
         incident = connector.read_incident("INC0000001")
         assert incident.incident_number == "INC0000001"
         assert incident.priority == Priority.P1
@@ -56,10 +58,12 @@ class TestInMemoryConnector:
         assert "disk full" in incident.short_description.lower()
 
     def test_read_incident_raises_for_unknown_number(self, connector):
+        """Verify that an unknown incident number raises IncidentNotFoundError."""
         with pytest.raises(IncidentNotFoundError):
             connector.read_incident("INC9999999")
 
     def test_list_recent_incidents_returns_most_recent_first(self, connector):
+        """Verify that list_recent_incidents returns all fixtures in descending date order."""
         incidents = connector.list_recent_incidents(limit=10)
         assert len(incidents) == 4
         # Most recent first
@@ -67,10 +71,12 @@ class TestInMemoryConnector:
         assert incidents[-1].incident_number == "INC0000001"
 
     def test_list_recent_incidents_respects_limit(self, connector):
+        """Verify that the limit parameter caps the number of returned incidents."""
         incidents = connector.list_recent_incidents(limit=1)
         assert len(incidents) == 1
 
     def test_raw_record_preserved(self, connector):
+        """Verify that the original fixture JSON is accessible via raw_record."""
         incident = connector.read_incident("INC0000002")
         assert incident.raw_record["number"] == "INC0000002"
 
@@ -79,8 +85,10 @@ class TestInMemoryConnector:
 
 
 class TestInMemoryLogStore:
+    """Verify that InMemoryLogStore honours the LogStoreInterface contract."""
 
     def test_returns_logs_within_time_window(self, log_store):
+        """Verify that only log lines within the requested time window are returned."""
         result = log_store.query_logs(
             host="cdp-worker-03",
             platform_tag=PlatformTag.CDP,
@@ -91,6 +99,7 @@ class TestInMemoryLogStore:
         assert all(line.source == "hdfs-datanode" for line in result.log_lines)
 
     def test_error_logs_returned_before_warn_and_info(self, log_store):
+        """Verify that ERROR lines appear before WARN lines in the result ordering."""
         result = log_store.query_logs(
             host="cdp-worker-03",
             platform_tag=PlatformTag.CDP,
@@ -104,6 +113,7 @@ class TestInMemoryLogStore:
         assert last_error_idx > first_warn_idx is False or last_error_idx < len(levels)
 
     def test_returns_empty_result_when_no_logs_found(self, log_store):
+        """Verify that querying an unknown host returns an empty LOW-confidence result."""
         result = log_store.query_logs(
             host="nonexistent-host",
             platform_tag=PlatformTag.GCP,
@@ -114,6 +124,7 @@ class TestInMemoryLogStore:
         assert result.confidence == ConfidenceBand.LOW
 
     def test_respects_max_results(self, log_store):
+        """Verify that the max_results parameter caps the number of returned log lines."""
         result = log_store.query_logs(
             host="cdp-worker-03",
             platform_tag=PlatformTag.CDP,
@@ -124,6 +135,7 @@ class TestInMemoryLogStore:
         assert len(result.log_lines) <= 2
 
     def test_excludes_logs_outside_time_window(self, log_store):
+        """Verify that log lines outside the time window are excluded from results."""
         result = log_store.query_logs(
             host="cdp-worker-03",
             platform_tag=PlatformTag.CDP,
@@ -139,8 +151,10 @@ class TestInMemoryLogStore:
 
 
 class TestInMemoryQueue:
+    """Verify that InMemoryQueue honours the QueueInterface contract."""
 
     def test_publish_and_subscribe_roundtrip(self, queue):
+        """Verify that a published message is retrieved by subscribe with a message ID attached."""
         queue.publish("alerts", {"incident_number": "INC0000001"})
         message = queue.subscribe("alerts")
         assert message is not None
@@ -148,9 +162,11 @@ class TestInMemoryQueue:
         assert "_message_id" in message
 
     def test_subscribe_returns_none_when_empty(self, queue):
+        """Verify that subscribing to an empty topic returns None."""
         assert queue.subscribe("alerts") is None
 
     def test_messages_consumed_in_order(self, queue):
+        """Verify that messages are delivered FIFO."""
         queue.publish("alerts", {"incident_number": "INC0000001"})
         queue.publish("alerts", {"incident_number": "INC0000002"})
         first = queue.subscribe("alerts")
@@ -159,11 +175,13 @@ class TestInMemoryQueue:
         assert second["incident_number"] == "INC0000002"
 
     def test_acknowledge_is_noop(self, queue):
+        """Verify that acknowledge does not raise and is safe to call."""
         queue.publish("alerts", {"incident_number": "INC0000001"})
         msg = queue.subscribe("alerts")
         queue.acknowledge(msg["_message_id"])  # should not raise
 
     def test_depth_reflects_queue_size(self, queue):
+        """Verify that depth tracks the correct number of unconsumed messages."""
         assert queue.depth("alerts") == 0
         queue.publish("alerts", {"incident_number": "INC0000001"})
         queue.publish("alerts", {"incident_number": "INC0000002"})
@@ -172,6 +190,7 @@ class TestInMemoryQueue:
         assert queue.depth("alerts") == 1
 
     def test_separate_topics_are_independent(self, queue):
+        """Verify that messages on different topics do not interfere with each other."""
         queue.publish("alerts", {"incident_number": "INC0000001"})
         queue.publish("other", {"incident_number": "INC0000002"})
         assert queue.depth("alerts") == 1
@@ -182,29 +201,36 @@ class TestInMemoryQueue:
 
 
 class TestInMemoryStateStore:
+    """Verify that InMemoryStateStore honours the StateStoreInterface contract."""
 
     def test_save_and_get_roundtrip(self, state_store):
+        """Verify that a saved value is returned unchanged by get."""
         state_store.save("INC0000001", {"status": "pending"})
         result = state_store.get("INC0000001")
         assert result == {"status": "pending"}
 
     def test_get_returns_none_for_unknown_key(self, state_store):
+        """Verify that get returns None for a key that was never saved."""
         assert state_store.get("INC9999999") is None
 
     def test_delete_removes_entry(self, state_store):
+        """Verify that delete removes the entry so a subsequent get returns None."""
         state_store.save("INC0000001", {"status": "pending"})
         state_store.delete("INC0000001")
         assert state_store.get("INC0000001") is None
 
     def test_delete_nonexistent_key_does_not_raise(self, state_store):
+        """Verify that deleting an unknown key is a safe no-op."""
         state_store.delete("INC9999999")  # should not raise
 
     def test_overwrite_updates_value(self, state_store):
+        """Verify that saving to an existing key replaces the stored value."""
         state_store.save("INC0000001", {"status": "pending"})
         state_store.save("INC0000001", {"status": "approved"})
         assert state_store.get("INC0000001")["status"] == "approved"
 
     def test_keys_returns_all_stored_keys(self, state_store):
+        """Verify that keys() returns every key that has been saved."""
         state_store.save("INC0000001", {})
         state_store.save("INC0000002", {})
         assert set(state_store.keys()) == {"INC0000001", "INC0000002"}

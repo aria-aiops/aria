@@ -47,6 +47,14 @@ class ServiceNowConnector(ConnectorInterface):
     """ConnectorInterface backed by the ServiceNow Table REST API."""
 
     def __init__(self) -> None:
+        """Initialise the connector using configuration from conf.yaml and environment variables.
+
+        Reads SNOW_INSTANCE and SNOW_USER from cfg (conf.yaml or env var fallback),
+        and SNOW_PASSWORD directly from the environment (never stored in conf.yaml).
+
+        Raises:
+            ValueError: If SNOW_INSTANCE, SNOW_USER, or SNOW_PASSWORD is not configured.
+        """
         instance = cfg.snow_instance()
         user = cfg.snow_user()
         password = os.environ.get("SNOW_PASSWORD", "")
@@ -70,6 +78,19 @@ class ServiceNowConnector(ConnectorInterface):
     # ── ConnectorInterface ──────────────────────────────────────────────────
 
     def read_incident(self, incident_number: str) -> IncidentMetadata:
+        """Fetch a single incident record by number from ServiceNow.
+
+        Args:
+            incident_number: ServiceNow incident number (e.g. 'INC0000060').
+
+        Returns:
+            Parsed IncidentMetadata.
+
+        Raises:
+            IncidentNotFoundError: If no record matches the incident number.
+            ConnectorAuthError: If ServiceNow rejects the credentials.
+            ConnectorUnavailableError: If ServiceNow cannot be reached.
+        """
         params = {
             "sysparm_query": f"number={incident_number}",
             "sysparm_fields": _SNOW_FIELDS,
@@ -82,6 +103,21 @@ class ServiceNowConnector(ConnectorInterface):
         return self._parse(records[0])
 
     def list_recent_incidents(self, limit: int = 10) -> list[IncidentMetadata]:
+        """Return the most recently opened, non-closed incidents for the configured assignment group.
+
+        Excludes state 6 (Resolved) and state 7 (Closed). If an assignment group is
+        configured, only incidents assigned to that group are returned.
+
+        Args:
+            limit: Maximum number of incidents to return.
+
+        Returns:
+            List of IncidentMetadata ordered by opened_at descending.
+
+        Raises:
+            ConnectorAuthError: If credentials are rejected.
+            ConnectorUnavailableError: If ServiceNow cannot be reached.
+        """
         query = "state!=6^state!=7^ORDERBYDESCopened_at"
         if self._assignment_group:
             query = f"assignment_group.name={self._assignment_group}^{query}"
@@ -96,6 +132,18 @@ class ServiceNowConnector(ConnectorInterface):
     # ── Internal helpers ────────────────────────────────────────────────────
 
     def _get(self, params: dict) -> list:
+        """Execute a GET request against the ServiceNow incident table and return the result list.
+
+        Args:
+            params: Query parameters to include in the request (sysparm_query, fields, etc.).
+
+        Returns:
+            The 'result' list from the JSON response. Empty list on 404.
+
+        Raises:
+            ConnectorUnavailableError: On connection failure or timeout.
+            ConnectorAuthError: On HTTP 401/403.
+        """
         try:
             response = requests.get(
                 self._base_url,
@@ -121,6 +169,17 @@ class ServiceNowConnector(ConnectorInterface):
         return response.json().get("result", [])
 
     def _parse(self, record: dict) -> IncidentMetadata:
+        """Convert a raw ServiceNow incident dict into an IncidentMetadata dataclass.
+
+        Uses _display() to extract the human-readable string from sysparm_display_value=all
+        field dicts. Missing optional fields are safely defaulted to None or empty string.
+
+        Args:
+            record: A single element from the ServiceNow Table API 'result' list.
+
+        Returns:
+            Parsed IncidentMetadata ready for downstream agents.
+        """
         return IncidentMetadata(
             incident_number=self._display(record.get("number", "")),
             caller=self._display(record.get("caller_id")) or None,
@@ -150,12 +209,24 @@ class ServiceNowConnector(ConnectorInterface):
 
     @staticmethod
     def _parse_priority(raw: str) -> Priority:
+        """Parse a ServiceNow priority string into a Priority enum value.
+
+        ServiceNow can return '1', '2', '3', '4' (raw values) or '1 - Critical',
+        '2 - High', etc. (display values). We look at only the first character to
+        handle both formats. Defaults to P3 for any unrecognised value.
+        """
         # ServiceNow returns "1", "2", "3", "4" (or "1 - Critical" with display values)
         first_char = raw.strip()[:1]
         return _PRIORITY_MAP.get(first_char, Priority.P3)
 
     @staticmethod
     def _parse_datetime(raw: str) -> datetime:
+        """Parse a ServiceNow datetime string, trying several formats in order.
+
+        ServiceNow instances can return dates in '%Y-%m-%d %H:%M:%S', ISO 8601,
+        or localised formats depending on instance configuration. Falls back to
+        datetime.now() so the pipeline never crashes on a bad date string.
+        """
         for fmt in (
             "%Y-%m-%d %H:%M:%S",
             "%Y-%m-%dT%H:%M:%S",
@@ -170,6 +241,7 @@ class ServiceNowConnector(ConnectorInterface):
 
     @staticmethod
     def _require_env(name: str) -> str:
+        """Return the value of an environment variable, raising ValueError if it is not set or empty."""
         value = os.environ.get(name)
         if not value:
             raise ValueError(f"Required environment variable {name!r} is not set")

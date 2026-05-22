@@ -9,5 +9,8 @@ from core.models import NotificationPayload
 
 
 class TelegramConnector(CommunicatorInterface):
+    """CommunicatorInterface scaffold for Telegram Bot API notifications. Not yet implemented."""
+
     def send(self, payload: NotificationPayload) -> str:
+        """Not implemented — raises NotImplementedError until the Telegram connector is built."""
         raise NotImplementedError("TelegramConnector is not yet implemented")

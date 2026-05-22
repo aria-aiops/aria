@@ -92,6 +92,20 @@ class ChromaKnowledgeBase(KnowledgeBaseInterface):
     # ── KnowledgeBaseInterface ────────────────────────────────────────────────
 
     def get_service_hints(self, cluster: str, description: str) -> list[str]:
+        """Return candidate service names ordered by semantic similarity to the cluster and description.
+
+        Performs a nearest-neighbour query against the Chroma collection using the
+        cluster name and incident description as the query text. Documents with a
+        cosine distance > 0.9 are filtered out as irrelevant.
+
+        Args:
+            cluster: Cluster CI name (e.g. 'cdp-prod-cluster-01').
+            description: Raw incident description text.
+
+        Returns:
+            List of service/component names from the matched runbook file stems.
+            Empty list if the collection is empty or all results are too distant.
+        """
         if self._collection.count() == 0:
             return []
         try:
@@ -117,6 +131,21 @@ class ChromaKnowledgeBase(KnowledgeBaseInterface):
         return names
 
     def get_log_hints(self, service: str, platform_tag: PlatformTag) -> LogAccessHint:
+        """Return log access guidance extracted from the most semantically relevant runbook docs.
+
+        Queries the Chroma collection using the service name and platform as the query text.
+        Only documents with cosine distance <= 0.8 contribute to path/keyword extraction —
+        documents beyond that threshold are too dissimilar to be reliable.
+
+        Args:
+            service: Resolved service or node name (e.g. 'hive-metastore').
+            platform_tag: Platform the service runs on (used to narrow the query text).
+
+        Returns:
+            LogAccessHint with extracted log paths and keywords from relevant runbooks.
+            confidence is derived from the nearest document's similarity score.
+            Returns empty hint if the collection is empty or a query error occurs.
+        """
         if self._collection.count() == 0:
             return LogAccessHint(
                 platform_tag=platform_tag, log_paths=[], keywords=[], confidence=0.0
@@ -154,6 +183,15 @@ class ChromaKnowledgeBase(KnowledgeBaseInterface):
     # ── Internal ──────────────────────────────────────────────────────────────
 
     def _load_runbooks(self, runbook_path: Path) -> None:
+        """Add any runbook files not yet in the Chroma collection.
+
+        Checks the existing collection IDs first to avoid re-embedding documents
+        on subsequent startups (important for persistent collections). New documents
+        are embedded and added in a single batch call to minimise API overhead.
+
+        Args:
+            runbook_path: Directory containing .md / .txt runbook files.
+        """
         files = list(runbook_path.glob("**/*.md")) + list(runbook_path.glob("**/*.txt"))
         if not files:
             logger.warning("ChromaKnowledgeBase: no .md/.txt files found in %s", runbook_path)

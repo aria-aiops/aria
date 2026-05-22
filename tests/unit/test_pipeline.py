@@ -22,6 +22,7 @@ _OPENED_AT = datetime(2026, 5, 9, 10, 0, 0)
 
 
 def _make_metadata() -> IncidentMetadata:
+    """Build a sample CDP P1 IncidentMetadata for pipeline tests."""
     return IncidentMetadata(
         incident_number="INC0000001",
         caller="ops",
@@ -37,6 +38,7 @@ def _make_metadata() -> IncidentMetadata:
 
 
 def _make_log_result() -> LogQueryResult:
+    """Build an empty LogQueryResult with a MEDIUM confidence for pipeline tests."""
     return LogQueryResult(
         log_lines=[],
         query_executed="grep OOM /var/log/hadoop-hdfs/namenode.log",
@@ -46,6 +48,7 @@ def _make_log_result() -> LogQueryResult:
 
 
 def _make_classification() -> ClassificationResult:
+    """Build a HIGH-confidence OOM ClassificationResult for pipeline tests."""
     return ClassificationResult(
         error_class="oom",
         error_label="Out of memory",
@@ -70,6 +73,7 @@ def _mock_agent1(meta: IncidentMetadata | None = None, error: str | None = None)
 
 
 def _mock_agent2(log_result: LogQueryResult | None = None, error: str | None = None):
+    """Build a mock Agent 2 that sets log_result and optionally error on the state."""
     agent = MagicMock()
 
     def run(state: PipelineState) -> PipelineState:
@@ -85,6 +89,7 @@ def _mock_agent3(
     classification: ClassificationResult | None = None,
     pending_log_request: LogRequest | None = None,
 ):
+    """Build a mock Agent 3 that sets classification and pending_log_request on the state."""
     agent = MagicMock()
 
     def run(state: PipelineState) -> PipelineState:
@@ -99,6 +104,7 @@ def _mock_agent3(
 
 
 def _mock_agent4(notification_sent: bool = True, error: str | None = None):
+    """Build a mock Agent 4 that sets notification_sent and optionally error on the state."""
     agent = MagicMock()
 
     def run(state: PipelineState) -> PipelineState:
@@ -113,6 +119,7 @@ def _mock_agent4(notification_sent: bool = True, error: str | None = None):
 
 
 def _make_pipeline(agent1=None, agent2=None, agent3=None, agent4=None) -> ARIAPipeline:
+    """Build an ARIAPipeline using default mock agents, overriding any that are supplied."""
     return ARIAPipeline(
         agent1=agent1 or _mock_agent1(),
         agent2=agent2 or _mock_agent2(),
@@ -137,7 +144,7 @@ def test_happy_path_full_pipeline():
 
 
 def test_happy_path_stub_classifier():
-    """Default stub ClassifierAgent returns unknown/LOW."""
+    """Verify that the default stub ClassifierAgent returns unknown/LOW without a ReAct loop."""
     stub_agent3 = ClassifierAgent()
     pipeline = _make_pipeline(agent3=stub_agent3)
     result = pipeline.run("INC0000001")
@@ -174,7 +181,7 @@ def test_agent1_error_routes_to_agent4_partial_notification():
 
 
 def test_agent4_error_sets_error_field():
-    """Agent 4 failure surfaces in result.error, pipeline still returns."""
+    """Verify that an Agent 4 failure sets result.error and notification_sent remains False."""
     pipeline = _make_pipeline(agent4=_mock_agent4(notification_sent=False, error="slack timeout"))
     result = pipeline.run("INC0000001")
 
@@ -215,7 +222,7 @@ def test_react_loop_fires_when_pending_log_request_set():
 
 
 def test_react_loop_capped_at_five_iterations():
-    """Agent 3 always requests more logs → loop stops at 5 agent2 calls."""
+    """Verify that the ReAct loop terminates after 5 agent2 calls even if agent3 keeps requesting."""
 
     def a3_always_request(state: PipelineState) -> PipelineState:
         state.pending_log_request = LogRequest(request="still need more logs")
@@ -238,7 +245,7 @@ def test_react_loop_capped_at_five_iterations():
 
 
 def test_pipeline_never_raises_on_unhandled_exception():
-    """A crash inside an agent node propagates as result.error, not an exception."""
+    """Verify that an unhandled agent crash surfaces as result.error and never propagates."""
 
     def crashing_run(state: PipelineState) -> PipelineState:
         raise RuntimeError("unexpected crash")

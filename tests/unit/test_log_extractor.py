@@ -26,6 +26,7 @@ _OPENED_AT = datetime(2025, 1, 15, 10, 0, 0)
 
 
 def _make_metadata(platform_tag=PlatformTag.CDP, affected_ci="cdp-namenode-01"):
+    """Build an IncidentMetadata for a CDP NameNode OOM incident, overriding platform/CI as needed."""
     return IncidentMetadata(
         incident_number="INC001",
         caller="ops",
@@ -41,6 +42,7 @@ def _make_metadata(platform_tag=PlatformTag.CDP, affected_ci="cdp-namenode-01"):
 
 
 def _make_result(n_lines=1):
+    """Build a LogQueryResult containing n_lines ERROR log lines."""
     lines = [
         LogLine(
             timestamp=_OPENED_AT,
@@ -59,6 +61,7 @@ def _make_result(n_lines=1):
 
 
 def _empty_result():
+    """Build an empty LogQueryResult with LOW confidence to simulate no logs found."""
     return LogQueryResult(
         log_lines=[],
         query_executed="test://",
@@ -71,6 +74,7 @@ def _empty_result():
 
 
 def test_run_no_metadata_sets_error():
+    """Verify that running without incident metadata sets state.error and leaves log_result None."""
     state = PipelineState(incident_number="INC001")
     agent = LogExtractorAgent(connector_registry={})
     result = agent.run(state)
@@ -81,6 +85,7 @@ def test_run_no_metadata_sets_error():
 
 
 def test_routes_to_cdp_connector():
+    """Verify that a CDP incident routes to the CDP-keyed connector."""
     connector = MagicMock(spec=LogStoreInterface)
     connector.query_logs.return_value = _make_result()
 
@@ -94,6 +99,7 @@ def test_routes_to_cdp_connector():
 
 
 def test_routes_to_gcp_connector():
+    """Verify that a GCP incident routes to the GCP-keyed connector."""
     connector = MagicMock(spec=LogStoreInterface)
     connector.query_logs.return_value = _make_result()
 
@@ -107,6 +113,7 @@ def test_routes_to_gcp_connector():
 
 
 def test_unknown_platform_no_connector_returns_empty():
+    """Verify that an unknown platform with no matching connector returns an empty LOW result."""
     state = PipelineState(
         incident_number="INC001",
         incident_metadata=_make_metadata(PlatformTag.UNKNOWN),
@@ -121,6 +128,7 @@ def test_unknown_platform_no_connector_returns_empty():
 
 
 def test_retry_with_extended_window_when_primary_empty():
+    """Verify that an empty primary query triggers a retry with a wider 60-minute window."""
     connector = MagicMock(spec=LogStoreInterface)
     connector.query_logs.side_effect = [_empty_result(), _make_result(3)]
 
@@ -139,6 +147,7 @@ def test_retry_with_extended_window_when_primary_empty():
 
 
 def test_no_retry_when_primary_returns_results():
+    """Verify that only one connector call is made when the primary query returns results."""
     connector = MagicMock(spec=LogStoreInterface)
     connector.query_logs.return_value = _make_result(5)
 
@@ -150,6 +159,7 @@ def test_no_retry_when_primary_returns_results():
 
 
 def test_kb_hints_passed_to_connector():
+    """Verify that KB-derived log_paths and keywords are forwarded to the connector call."""
     connector = MagicMock(spec=LogStoreInterface)
     connector.query_logs.return_value = _make_result()
 
@@ -172,6 +182,7 @@ def test_kb_hints_passed_to_connector():
 
 
 def test_connector_exception_returns_empty():
+    """Verify that a connector exception returns an empty LOW result without setting state.error."""
     connector = MagicMock(spec=LogStoreInterface)
     connector.query_logs.side_effect = RuntimeError("SSH timeout")
 
@@ -185,6 +196,7 @@ def test_connector_exception_returns_empty():
 
 
 def test_kb_failure_does_not_crash():
+    """Verify that a KB exception is tolerated and the agent still returns a log result."""
     connector = MagicMock(spec=LogStoreInterface)
     connector.query_logs.return_value = _make_result()
 
@@ -203,6 +215,7 @@ def test_kb_failure_does_not_crash():
 
 
 def _valid_plan_json(connector_name: str = "cdp") -> str:
+    """Build a valid JSON string representing a LogQueryPlan as the LLM would return it."""
     return json.dumps(
         {
             "connector_name": connector_name,
@@ -237,7 +250,7 @@ def test_llm_planning_returns_correct_query_plan():
 
 
 def test_llm_planning_sets_state_log_query_plan():
-    """state.log_query_plan is a LogQueryPlan instance after a successful LLM call."""
+    """Verify that state.log_query_plan is a LogQueryPlan instance after a successful LLM call."""
     connector = MagicMock(spec=LogStoreInterface)
     connector.query_logs.return_value = _make_result()
     llm = MagicMock(spec=LLMClientInterface)

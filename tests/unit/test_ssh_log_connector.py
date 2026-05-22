@@ -24,12 +24,14 @@ _LOG_DIRS = ["/var/log/hadoop-hdfs", "/var/log/hadoop-yarn"]
 
 
 def _make_vault(key_pem="-----BEGIN RSA PRIVATE KEY-----\ntest\n-----END RSA PRIVATE KEY-----"):
+    """Build a mock vault that returns the given PEM key from get_secret."""
     vault = MagicMock()
     vault.get_secret.return_value = key_pem
     return vault
 
 
 def _make_connector(**kwargs):
+    """Instantiate SSHLogConnector with sensible test defaults, overriding any supplied kwargs."""
     defaults = dict(
         vault=_make_vault(),
         ssh_key_secret="TEST_SSH_KEY",
@@ -45,6 +47,7 @@ def _make_connector(**kwargs):
 
 
 def test_parse_line_valid_comma_ts():
+    """Verify that a comma-millisecond timestamp is parsed into a correct LogLine."""
     raw = "2025-01-15 10:00:00,123 ERROR org.apache.hadoop.NameNode: Out of memory"
     ll = _parse_line(raw, _HOST)
     assert ll is not None
@@ -55,6 +58,7 @@ def test_parse_line_valid_comma_ts():
 
 
 def test_parse_line_valid_dot_ts():
+    """Verify that a dot-millisecond timestamp is also parsed correctly."""
     raw = "2025-01-15 10:00:00.456 WARN SomeClass: disk full"
     ll = _parse_line(raw, _HOST)
     assert ll is not None
@@ -62,6 +66,7 @@ def test_parse_line_valid_dot_ts():
 
 
 def test_parse_line_invalid_returns_none():
+    """Verify that unrecognised or empty strings return None from _parse_line."""
     assert _parse_line("not a log line", _HOST) is None
     assert _parse_line("", _HOST) is None
 
@@ -73,6 +78,7 @@ def test_parse_line_invalid_returns_none():
 @patch("implementations.clusters.onprem.log_connector._load_private_key")
 @patch("implementations.clusters.onprem.log_connector.paramiko.SSHClient")
 def test_ssh_success_returns_log_lines(mock_ssh_cls, mock_load_key, mock_load_host_key):
+    """Verify that a successful SSH session returns the correct number and level of log lines."""
     mock_load_key.return_value = MagicMock()
     mock_client = MagicMock()
     mock_ssh_cls.return_value = mock_client
@@ -95,6 +101,7 @@ def test_ssh_success_returns_log_lines(mock_ssh_cls, mock_load_key, mock_load_ho
 @patch("implementations.clusters.onprem.log_connector._load_private_key")
 @patch("implementations.clusters.onprem.log_connector.paramiko.SSHClient")
 def test_ssh_failure_returns_empty(mock_ssh_cls, mock_load_key, mock_load_host_key):
+    """Verify that an SSH connect failure returns an empty LOW-confidence result."""
     mock_load_key.return_value = MagicMock()
     mock_client = MagicMock()
     mock_ssh_cls.return_value = mock_client
@@ -111,6 +118,7 @@ def test_ssh_failure_returns_empty(mock_ssh_cls, mock_load_key, mock_load_host_k
 @patch("implementations.clusters.onprem.log_connector._load_private_key")
 @patch("implementations.clusters.onprem.log_connector.paramiko.SSHClient")
 def test_time_window_filtering(mock_ssh_cls, mock_load_key, mock_load_host_key):
+    """Verify that log lines outside the time window are excluded from the result."""
     mock_load_key.return_value = MagicMock()
     mock_client = MagicMock()
     mock_ssh_cls.return_value = mock_client
@@ -134,6 +142,7 @@ def test_time_window_filtering(mock_ssh_cls, mock_load_key, mock_load_host_key):
 def test_uses_constructor_log_dirs_when_no_log_paths(
     mock_ssh_cls, mock_load_key, mock_load_host_key
 ):
+    """Verify that constructor log_dirs are used in the grep command when log_paths is None."""
     mock_load_key.return_value = MagicMock()
     mock_client = MagicMock()
     mock_ssh_cls.return_value = mock_client
@@ -151,6 +160,7 @@ def test_uses_constructor_log_dirs_when_no_log_paths(
 
 
 def test_no_log_dirs_returns_empty():
+    """Verify that a connector with no log_dirs returns an empty LOW-confidence result."""
     result = _make_connector(log_dirs=None).query_logs(_HOST, PlatformTag.CDP, _START, _END)
 
     assert result.log_lines == []
@@ -161,6 +171,7 @@ def test_no_log_dirs_returns_empty():
 @patch("implementations.clusters.onprem.log_connector._load_private_key")
 @patch("implementations.clusters.onprem.log_connector.paramiko.SSHClient")
 def test_uses_provided_keywords_in_grep(mock_ssh_cls, mock_load_key, mock_load_host_key):
+    """Verify that supplied keywords are included in the remote grep command."""
     mock_load_key.return_value = MagicMock()
     mock_client = MagicMock()
     mock_ssh_cls.return_value = mock_client
@@ -179,6 +190,7 @@ def test_uses_provided_keywords_in_grep(mock_ssh_cls, mock_load_key, mock_load_h
 @patch("implementations.clusters.onprem.log_connector._load_private_key")
 @patch("implementations.clusters.onprem.log_connector.paramiko.SSHClient")
 def test_error_before_warn_in_output(mock_ssh_cls, mock_load_key, mock_load_host_key):
+    """Verify that ERROR lines are sorted before WARN lines in the result."""
     mock_load_key.return_value = MagicMock()
     mock_client = MagicMock()
     mock_ssh_cls.return_value = mock_client
@@ -200,6 +212,7 @@ def test_error_before_warn_in_output(mock_ssh_cls, mock_load_key, mock_load_host
 @patch("implementations.clusters.onprem.log_connector._load_private_key")
 @patch("implementations.clusters.onprem.log_connector.paramiko.SSHClient")
 def test_max_results_truncation(mock_ssh_cls, mock_load_key, mock_load_host_key):
+    """Verify that max_results caps the returned lines while total_scanned reflects the full count."""
     mock_load_key.return_value = MagicMock()
     mock_client = MagicMock()
     mock_ssh_cls.return_value = mock_client
@@ -216,6 +229,7 @@ def test_max_results_truncation(mock_ssh_cls, mock_load_key, mock_load_host_key)
 
 
 def test_vault_key_name_used():
+    """Verify that the connector calls vault.get_secret with the configured ssh_key_secret name."""
     vault = _make_vault()
     connector = _make_connector(vault=vault, ssh_key_secret="MY_CLUSTER_KEY")
 

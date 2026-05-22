@@ -22,7 +22,10 @@ from core.models import PlatformTag
 
 
 class TestDatabricksStub:
+    """Verify that the Databricks stub connector raises NotImplementedError as expected."""
+
     def test_raises_not_implemented(self):
+        """Verify that calling query_logs on the Databricks stub raises NotImplementedError."""
         from implementations.clusters.cloud.databricks.log_connector import DatabricksLogConnector
 
         connector = DatabricksLogConnector()
@@ -36,7 +39,10 @@ class TestDatabricksStub:
 
 
 class TestAWSEMRStub:
+    """Verify that the AWS EMR stub connector raises NotImplementedError as expected."""
+
     def test_raises_not_implemented(self):
+        """Verify that calling query_logs on the AWS EMR stub raises NotImplementedError."""
         from implementations.clusters.cloud.aws.log_connector import AWSEMRLogConnector
 
         connector = AWSEMRLogConnector()
@@ -50,7 +56,10 @@ class TestAWSEMRStub:
 
 
 class TestAzureStub:
+    """Verify that the Azure stub connector raises NotImplementedError as expected."""
+
     def test_raises_not_implemented(self):
+        """Verify that calling query_logs on the Azure stub raises NotImplementedError."""
         from implementations.clusters.cloud.azure.log_connector import AzureLogConnector
 
         connector = AzureLogConnector()
@@ -67,12 +76,16 @@ class TestAzureStub:
 
 
 class TestSSHLogConnectorImport:
+    """ARI-67 regression guard — verifies SSHLogConnector is accessible at its new module path."""
+
     def test_imports_from_new_path(self):
+        """Verify that SSHLogConnector can be imported from its new onprem path."""
         from implementations.clusters.onprem.log_connector import SSHLogConnector
 
         assert SSHLogConnector is not None
 
     def test_instantiates_with_required_params(self):
+        """Verify that SSHLogConnector instantiates successfully with minimal required arguments."""
         from implementations.clusters.onprem.log_connector import SSHLogConnector
 
         connector = SSHLogConnector(
@@ -84,6 +97,7 @@ class TestSSHLogConnectorImport:
         assert connector is not None
 
     def test_old_cdp_path_no_longer_exists(self):
+        """Verify that the old implementations.cdp path has been removed."""
         with pytest.raises(ModuleNotFoundError):
             import implementations.cdp.log_connector  # noqa: F401
 
@@ -92,18 +106,23 @@ class TestSSHLogConnectorImport:
 
 
 class TestGCPLogConnectorImport:
+    """ARI-67 regression guard — verifies GCPLogConnector is accessible at its new module path."""
+
     def test_imports_from_new_path(self):
+        """Verify that GCPLogConnector can be imported from its new cloud/gcp path."""
         from implementations.clusters.cloud.gcp.log_connector import GCPLogConnector
 
         assert GCPLogConnector is not None
 
     def test_instantiates(self):
+        """Verify that GCPLogConnector can be instantiated with a mock vault."""
         from implementations.clusters.cloud.gcp.log_connector import GCPLogConnector
 
         connector = GCPLogConnector(vault=MagicMock())
         assert connector is not None
 
     def test_old_gcp_path_no_longer_exists(self):
+        """Verify that the old implementations.gcp path has been removed."""
         with pytest.raises(ModuleNotFoundError):
             import implementations.gcp.log_connector  # noqa: F401
 
@@ -117,6 +136,7 @@ class TestOracleKafkaViaSSH:
     """
 
     def test_ssh_connector_usable_for_oracle(self):
+        """Verify that SSHLogConnector can be instantiated with Oracle-specific log dirs."""
         from implementations.clusters.onprem.log_connector import SSHLogConnector
 
         connector = SSHLogConnector(
@@ -128,6 +148,7 @@ class TestOracleKafkaViaSSH:
         assert connector is not None
 
     def test_ssh_connector_usable_for_kafka(self):
+        """Verify that SSHLogConnector can be instantiated with Kafka-specific log dirs."""
         from implementations.clusters.onprem.log_connector import SSHLogConnector
 
         connector = SSHLogConnector(

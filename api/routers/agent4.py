@@ -27,6 +27,10 @@ router = APIRouter(prefix="/agent4", tags=["Agent 4"])
 
 
 def _confidence_band_from_str(value: str) -> ConfidenceBand:
+    """Parse a confidence band string ('high', 'medium', 'low') into ConfidenceBand.
+
+    Falls back to LOW on any invalid value so the endpoint never crashes on bad input.
+    """
     try:
         return ConfidenceBand(value.lower())
     except ValueError:
@@ -35,6 +39,13 @@ def _confidence_band_from_str(value: str) -> ConfidenceBand:
 
 @router.post("/run", response_model=Agent4Response)
 def run_agent4(request: Agent4RunRequest) -> Agent4Response:
+    """Run Agent 4 to send a Slack notification for the given incident.
+
+    If a classification is supplied in the request body it is injected into the
+    pipeline state; otherwise Agent 4 sends a partial notification (is_partial=True).
+
+    Returns HTTP 503 if Slack credentials are not configured.
+    """
     t0 = time.monotonic()
 
     try:
@@ -89,6 +100,7 @@ def run_agent4(request: Agent4RunRequest) -> Agent4Response:
 
 @router.get("/health", response_model=AgentHealthResponse)
 def agent4_health() -> AgentHealthResponse:
+    """Check whether Agent 4's Slack credentials (bot token + channel ID) are configured."""
     token_set = bool(os.environ.get("SLACK_BOT_TOKEN"))
     channel_set = bool(cfg.slack_channel_id())
     status = "ready" if (token_set and channel_set) else "degraded"

@@ -29,6 +29,7 @@ _OPENED_AT = datetime(2026, 5, 9, 10, 0, 0)
 
 
 def _make_metadata() -> IncidentMetadata:
+    """Build a sample CDP IncidentMetadata for a P1 HDFS OOM incident."""
     return IncidentMetadata(
         incident_number="INC0010001",
         caller="ops",
@@ -44,6 +45,7 @@ def _make_metadata() -> IncidentMetadata:
 
 
 def _make_classification(band: ConfidenceBand = ConfidenceBand.LOW) -> ClassificationResult:
+    """Build a sample ClassificationResult for an OOM error with the given confidence band."""
     return ClassificationResult(
         error_class="oom",
         error_label="OOM Error",
@@ -55,6 +57,7 @@ def _make_classification(band: ConfidenceBand = ConfidenceBand.LOW) -> Classific
 
 
 def _make_log_result() -> LogQueryResult:
+    """Build a sample LogQueryResult with one ERROR line for use in notification tests."""
     return LogQueryResult(
         log_lines=[
             LogLine(
@@ -71,6 +74,7 @@ def _make_log_result() -> LogQueryResult:
 
 
 def _mock_comm(return_value: str = "1234567890.123456") -> MagicMock:
+    """Build a mock CommunicatorInterface whose send returns the given message timestamp."""
     comm = MagicMock(spec=CommunicatorInterface)
     comm.send.return_value = return_value
     return comm
@@ -80,6 +84,7 @@ def _mock_comm(return_value: str = "1234567890.123456") -> MagicMock:
 
 
 def test_full_notification_success():
+    """Verify that a complete pipeline state results in a successful, non-partial notification."""
     comm = _mock_comm()
     agent = NotifierAgent(communicator=comm)
     state = PipelineState(incident_number="INC0010001")
@@ -146,6 +151,7 @@ def test_send_failure_sets_error():
 
 
 def test_payload_log_summary_formatted():
+    """Verify that log_summary is rendered as '<n> lines scanned (<query>)'."""
     comm = _mock_comm()
     agent = NotifierAgent(communicator=comm)
     state = PipelineState(incident_number="INC0010001")
@@ -162,6 +168,7 @@ def test_payload_log_summary_formatted():
 
 
 def _make_payload(band: ConfidenceBand | None, is_partial: bool = False) -> NotificationPayload:
+    """Build a NotificationPayload for Slack template tests with the given confidence band."""
     return NotificationPayload(
         incident_number="INC0010001",
         priority="P1",
@@ -188,10 +195,12 @@ def _make_payload(band: ConfidenceBand | None, is_partial: bool = False) -> Noti
     ],
 )
 def test_confidence_colour_mapping(band, expected_color):
+    """Verify that each ConfidenceBand maps to its expected Slack attachment colour."""
     assert _CONFIDENCE_COLORS.get(band) == expected_color
 
 
 def test_build_attachment_full_notification():
+    """Verify that a full notification attachment contains the classification label and confidence band."""
     payload = _make_payload(ConfidenceBand.LOW)
     attachment = build_attachment(payload)
     assert attachment["color"] == "#de3c3c"
@@ -206,6 +215,7 @@ def test_build_attachment_full_notification():
 
 
 def test_build_attachment_partial_notification():
+    """Verify that a partial notification attachment uses the grey colour and says 'pending'."""
     payload = _make_payload(None, is_partial=True)
     attachment = build_attachment(payload)
     assert attachment["color"] == "#888888"
@@ -219,6 +229,7 @@ def test_build_attachment_partial_notification():
 
 
 def test_build_attachment_has_log_summary_footer():
+    """Verify that the attachment includes exactly one context block containing the log summary."""
     payload = _make_payload(ConfidenceBand.HIGH)
     attachment = build_attachment(payload)
     context_blocks = [b for b in attachment["blocks"] if b.get("type") == "context"]

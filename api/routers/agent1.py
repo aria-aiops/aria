@@ -25,6 +25,14 @@ router = APIRouter(prefix="/agent1", tags=["Agent 1"])
 
 @router.post("/run", response_model=Agent1Response)
 def run_agent1(request: Agent1RunRequest) -> Agent1Response:
+    """Run Agent 1 for the given incident number.
+
+    Fetches the incident from ServiceNow, resolves the affected CI via the
+    three-path strategy, and returns the structured IncidentMetadata.
+
+    Returns HTTP 503 if credentials are not configured, 404 if the incident
+    is not found, 502 on auth failure, 503 on connectivity issues.
+    """
     try:
         agent = get_agent1()
     except ValueError as exc:
@@ -85,6 +93,7 @@ def run_agent1(request: Agent1RunRequest) -> Agent1Response:
 
 @router.get("/health", response_model=AgentHealthResponse)
 def agent1_health() -> AgentHealthResponse:
+    """Check whether Agent 1's dependencies (LLM model + ServiceNow credentials) are configured."""
     model = cfg.resolve_model("1")
     snow_ready = all([cfg.snow_instance(), cfg.snow_user(), os.environ.get("SNOW_PASSWORD")])
     status = "ready" if (model and snow_ready) else "degraded"

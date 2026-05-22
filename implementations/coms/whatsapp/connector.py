@@ -9,5 +9,8 @@ from core.models import NotificationPayload
 
 
 class WhatsAppConnector(CommunicatorInterface):
+    """CommunicatorInterface scaffold for WhatsApp Business Cloud API notifications. Not yet implemented."""
+
     def send(self, payload: NotificationPayload) -> str:
+        """Not implemented — raises NotImplementedError until the WhatsApp connector is built."""
         raise NotImplementedError("WhatsAppConnector is not yet implemented")

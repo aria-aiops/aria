@@ -14,6 +14,7 @@ _END = datetime(2026, 4, 16, 3, 0)
 
 
 def _make_vault(secrets: dict) -> MagicMock:
+    """Build a mock vault that returns values from the given dict or raises VaultSecretNotFoundError."""
     vault = MagicMock()
 
     def get(key):
@@ -29,15 +30,19 @@ def _make_vault(secrets: dict) -> MagicMock:
 
 
 class TestAWSEMRLogConnector:
+    """Tests for AWSEMRLogConnector — all S3 calls are mocked, no real AWS credentials needed."""
+
     from implementations.clusters.cloud.aws.log_connector import AWSEMRLogConnector
 
     def _make(self, bucket="my-emr-logs", region="eu-west-1"):
+        """Instantiate AWSEMRLogConnector with a mock vault supplying bucket and region."""
         from implementations.clusters.cloud.aws.log_connector import AWSEMRLogConnector
 
         vault = _make_vault({"EMR_LOG_BUCKET": bucket, "EMR_REGION": region})
         return AWSEMRLogConnector(vault=vault)
 
     def test_returns_parsed_log_lines(self):
+        """Verify that plain-text S3 log objects are parsed into correctly levelled LogLines."""
         log_content = (
             b"2026-04-16 02:05:00,000 ERROR org.apache.hadoop.hdfs.server.namenode.FSNamesystem: "
             b"Disk quota exceeded\n"
@@ -66,6 +71,7 @@ class TestAWSEMRLogConnector:
         assert result.log_lines[1].level == "WARN"
 
     def test_handles_gzipped_files(self):
+        """Verify that gzip-compressed S3 objects are decompressed and parsed correctly."""
         raw = b"2026-04-16 02:05:00,000 ERROR Class: Disk full\n"
         compressed = gzip.compress(raw)
 
@@ -90,6 +96,7 @@ class TestAWSEMRLogConnector:
         assert result.log_lines[0].level == "ERROR"
 
     def test_empty_bucket_returns_low_confidence(self):
+        """Verify that an S3 bucket with no matching objects yields an empty LOW-confidence result."""
         mock_s3 = MagicMock()
         mock_s3.get_paginator.return_value.paginate.return_value = [{}]
 
@@ -101,6 +108,7 @@ class TestAWSEMRLogConnector:
         assert result.confidence == ConfidenceBand.LOW
 
     def test_missing_region_falls_back_to_default(self):
+        """Verify that a missing EMR_REGION secret causes the connector to use us-east-1."""
         vault = _make_vault({"EMR_LOG_BUCKET": "bucket"})
         from implementations.clusters.cloud.aws.log_connector import AWSEMRLogConnector
 
@@ -114,6 +122,7 @@ class TestAWSEMRLogConnector:
             assert kwargs["region_name"] == "us-east-1"
 
     def test_no_credentials_raises_unavailable(self):
+        """Verify that missing AWS credentials raise LogStoreUnavailableError."""
         from botocore.exceptions import NoCredentialsError
 
         from implementations.clusters.cloud.aws.log_connector import AWSEMRLogConnector
@@ -127,6 +136,7 @@ class TestAWSEMRLogConnector:
                 connector.query_logs("j-X", PlatformTag.AWS, _START, _END)
 
     def test_keyword_filter_applied(self):
+        """Verify that only log lines matching the supplied keywords are returned."""
         log_content = (
             b"2026-04-16 02:05:00,000 ERROR Class: OutOfMemory error\n"
             b"2026-04-16 02:06:00,000 ERROR Class: Disk quota exceeded\n"
@@ -158,13 +168,17 @@ class TestAWSEMRLogConnector:
 
 
 class TestAzureLogConnector:
+    """Tests for AzureLogConnector — Azure Monitor SDK calls are fully mocked."""
+
     def _make(self, workspace_id="ws-123"):
+        """Instantiate AzureLogConnector with a mock vault supplying the workspace ID."""
         from implementations.clusters.cloud.azure.log_connector import AzureLogConnector
 
         vault = _make_vault({"AZURE_LOG_WORKSPACE_ID": workspace_id})
         return AzureLogConnector(vault=vault)
 
     def _mock_response(self, rows):
+        """Build a mock LogsQueryClient response with the given table rows."""
         from unittest.mock import MagicMock
 
         from azure.monitor.query import LogsQueryStatus
@@ -193,6 +207,7 @@ class TestAzureLogConnector:
         return resp
 
     def test_returns_log_lines(self):
+        """Verify that Azure Monitor query results are mapped to LogLine objects."""
         from implementations.clusters.cloud.azure.log_connector import AzureLogConnector
 
         vault = _make_vault({"AZURE_LOG_WORKSPACE_ID": "ws-123"})
@@ -212,6 +227,7 @@ class TestAzureLogConnector:
         assert "Disk quota" in result.log_lines[0].message
 
     def test_auth_failure_raises_unavailable(self):
+        """Verify that an Azure credential failure raises LogStoreUnavailableError."""
         from implementations.clusters.cloud.azure.log_connector import AzureLogConnector
 
         connector = AzureLogConnector(vault=_make_vault({"AZURE_LOG_WORKSPACE_ID": "ws"}))
@@ -223,6 +239,7 @@ class TestAzureLogConnector:
                 connector.query_logs("host", PlatformTag.AZURE, _START, _END)
 
     def test_query_error_returns_empty(self):
+        """Verify that an HTTP query error produces an empty LOW-confidence result."""
         from azure.core.exceptions import HttpResponseError
 
         from implementations.clusters.cloud.azure.log_connector import AzureLogConnector
@@ -238,6 +255,7 @@ class TestAzureLogConnector:
         assert result.confidence == ConfidenceBand.LOW
 
     def test_severity_mapping(self):
+        """Verify that Azure severity strings (warning, crit, info) map to standard levels."""
         from implementations.clusters.cloud.azure.log_connector import AzureLogConnector
 
         vault = _make_vault({"AZURE_LOG_WORKSPACE_ID": "ws"})
@@ -265,18 +283,23 @@ class TestAzureLogConnector:
 
 
 class TestDatabricksLogConnector:
+    """Tests for DatabricksLogConnector — Databricks REST API calls are mocked via requests."""
+
     def _make(self, db_host="https://adb-1234.azuredatabricks.net", token="dapi-xxx"):
+        """Instantiate DatabricksLogConnector with a mock vault supplying host and token."""
         from implementations.clusters.cloud.databricks.log_connector import DatabricksLogConnector
 
         vault = _make_vault({"DATABRICKS_HOST": db_host, "DATABRICKS_TOKEN": token})
         return DatabricksLogConnector(vault=vault)
 
     def _mock_get(self, status_code=200):
+        """Return a mock requests.Response for a cluster GET with the given status code."""
         resp = MagicMock()
         resp.status_code = status_code
         return resp
 
     def _mock_events(self, events):
+        """Return a mock requests.Response carrying a Databricks cluster events payload."""
         resp = MagicMock()
         resp.status_code = 200
         resp.json.return_value = {"events": events}
@@ -284,7 +307,7 @@ class TestDatabricksLogConnector:
         return resp
 
     def test_returns_error_events_as_log_lines(self):
-
+        """Verify that a DRIVER_NOT_RESPONDING event is returned as an ERROR LogLine."""
         connector = self._make()
         event = {
             "timestamp": int(_START.timestamp() * 1000) + 5000,
@@ -302,6 +325,7 @@ class TestDatabricksLogConnector:
         assert "DRIVER_NOT_RESPONDING" in result.log_lines[0].message
 
     def test_401_raises_unavailable(self):
+        """Verify that a 401 from the Databricks API raises LogStoreUnavailableError."""
         connector = self._make()
         with patch("implementations.clusters.cloud.databricks.log_connector.requests") as mock_req:
             mock_req.get.return_value = self._mock_get(401)
@@ -309,6 +333,7 @@ class TestDatabricksLogConnector:
                 connector.query_logs("cluster", PlatformTag.DATABRICKS, _START, _END)
 
     def test_cluster_not_found_returns_empty(self):
+        """Verify that a 404 (cluster not found) returns an empty LOW-confidence result."""
         connector = self._make()
         with patch("implementations.clusters.cloud.databricks.log_connector.requests") as mock_req:
             mock_req.get.return_value = self._mock_get(404)
@@ -317,6 +342,7 @@ class TestDatabricksLogConnector:
         assert result.confidence == ConfidenceBand.LOW
 
     def test_unreachable_raises_unavailable(self):
+        """Verify that a connection error to the Databricks host raises LogStoreUnavailableError."""
         connector = self._make()
         with patch("implementations.clusters.cloud.databricks.log_connector.requests") as mock_req:
             mock_req.get.side_effect = Exception("connection refused")
@@ -324,6 +350,7 @@ class TestDatabricksLogConnector:
                 connector.query_logs("cluster", PlatformTag.DATABRICKS, _START, _END)
 
     def test_warn_events_mapped_correctly(self):
+        """Verify that a NODES_LOST event is mapped to a WARN-level LogLine."""
         connector = self._make()
         event = {
             "timestamp": int(_START.timestamp() * 1000) + 1000,
@@ -338,6 +365,7 @@ class TestDatabricksLogConnector:
         assert result.log_lines[0].level == "WARN"
 
     def test_keyword_filter_applied(self):
+        """Verify that only events containing the supplied keyword are returned."""
         connector = self._make()
         events = [
             {
@@ -391,6 +419,7 @@ class TestChromaKnowledgeBase:
         return mock_chroma, collection
 
     def test_get_service_hints_returns_names(self, tmp_path):
+        """Verify that get_service_hints returns underscore-to-hyphen converted runbook names."""
         (tmp_path / "hdfs_runbook.md").write_text("HDFS disk full recovery steps")
 
         metadatas = [{"name": "hdfs_runbook"}, {"name": "yarn_runbook"}]
@@ -411,6 +440,7 @@ class TestChromaKnowledgeBase:
         assert "yarn-runbook" in hints
 
     def test_get_service_hints_filters_by_distance(self, tmp_path):
+        """Verify that results with a cosine distance above the threshold are excluded."""
         (tmp_path / "irrelevant.md").write_text("completely unrelated content")
 
         metadatas = [{"name": "irrelevant"}]
@@ -428,6 +458,7 @@ class TestChromaKnowledgeBase:
         assert hints == []
 
     def test_get_log_hints_extracts_paths_and_keywords(self, tmp_path):
+        """Verify that get_log_hints extracts log file paths and keywords from runbook text."""
         (tmp_path / "hdfs.md").write_text(
             "Check /var/log/hadoop/hdfs/namenode.log for HDFS errors. "
             "Look for DiskOutOfSpaceException and WARN entries."
@@ -454,6 +485,7 @@ class TestChromaKnowledgeBase:
         assert hint.confidence > 0
 
     def test_empty_collection_returns_empty_hints(self, tmp_path):
+        """Verify that an empty Chroma collection returns empty hints and zero confidence."""
         mock_chroma, collection = self._make_mock_chroma()
         collection.count.return_value = 0
 
@@ -470,6 +502,7 @@ class TestChromaKnowledgeBase:
         assert log_hint.keywords == []
 
     def test_missing_chromadb_raises_knowledge_base_error(self, tmp_path):
+        """Verify that an uninstalled chromadb package raises KnowledgeBaseError on init."""
         import sys
 
         from core.exceptions import KnowledgeBaseError
@@ -492,6 +525,7 @@ class TestChromaKnowledgeBase:
                 sys.modules.pop("chromadb", None)
 
     def test_nonexistent_runbook_dir_raises(self):
+        """Verify that a non-existent runbook directory raises KnowledgeBaseError."""
         mock_chroma, _ = self._make_mock_chroma()
         from core.exceptions import KnowledgeBaseError
 
@@ -502,6 +536,7 @@ class TestChromaKnowledgeBase:
                 ChromaKnowledgeBase(runbook_dir="/does/not/exist")
 
     def test_confidence_based_on_top_distance(self, tmp_path):
+        """Verify that confidence is computed from the top-result distance (distance 0.15 → ~0.85)."""
         (tmp_path / "spark.md").write_text("Spark executor OOM recovery")
 
         docs = ["Spark executor OOM recovery"]
