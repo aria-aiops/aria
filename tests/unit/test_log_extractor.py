@@ -333,3 +333,88 @@ def test_no_llm_injected_uses_static_routing():
     assert result.log_query_plan is None
     assert result.error is None
     connector.query_logs.assert_called()
+
+
+# ── ReAct loop / pending_log_request tests ────────────────────────────────────
+
+
+def test_pending_log_request_fetches_from_resolved_host():
+    """pending_log_request with a known CI name → connector called with resolved IP."""
+    from core.models import LogRequest
+
+    connector = MagicMock(spec=LogStoreInterface)
+    connector.query_logs.return_value = _make_result(2)
+
+    state = PipelineState(
+        incident_number="INC001",
+        incident_metadata=_make_metadata(PlatformTag.CDP, affected_ci="cdp-dn-02"),
+    )
+    state.pending_log_request = LogRequest(
+        request="Fetch NameNode logs from cdp-nn-02 — crash indicated in DataNode logs",
+        priority="high",
+    )
+
+    agent = LogExtractorAgent(
+        {PlatformTag.CDP: connector},
+        cluster_hosts={"cdp-nn-02": "10.0.0.5", "cdp-dn-02": "10.0.0.1"},
+    )
+    agent.run(state)
+
+    connector.query_logs.assert_called_once()
+    assert connector.query_logs.call_args.kwargs["host"] == "10.0.0.5"
+
+
+def test_pending_log_request_merges_new_lines_with_existing():
+    """Cross-service fetch appends new log lines to existing log_result, not replace."""
+    from core.models import LogRequest
+
+    connector = MagicMock(spec=LogStoreInterface)
+    connector.query_logs.return_value = _make_result(3)
+
+    state = PipelineState(
+        incident_number="INC001",
+        incident_metadata=_make_metadata(PlatformTag.CDP, affected_ci="cdp-dn-02"),
+    )
+    state.log_result = _make_result(2)  # 2 lines from first Agent 2 run
+    state.pending_log_request = LogRequest(
+        request="Fetch NameNode logs from cdp-nn-02",
+        priority="high",
+    )
+
+    agent = LogExtractorAgent(
+        {PlatformTag.CDP: connector},
+        cluster_hosts={"cdp-nn-02": "10.0.0.5"},
+    )
+    result = agent.run(state)
+
+    assert result.log_result is not None
+    assert len(result.log_result.log_lines) == 5  # 2 existing + 3 new
+    assert result.log_result.total_scanned == 5
+
+
+def test_pending_log_request_unknown_ci_returns_state_unchanged():
+    """pending_log_request naming an unknown CI → warning logged, state unchanged, no error."""
+    from core.models import LogRequest
+
+    connector = MagicMock(spec=LogStoreInterface)
+
+    original_result = _make_result(2)
+    state = PipelineState(
+        incident_number="INC001",
+        incident_metadata=_make_metadata(PlatformTag.CDP),
+    )
+    state.log_result = original_result
+    state.pending_log_request = LogRequest(
+        request="Fetch logs from totally-unknown-host-99 — mystery service",
+        priority="medium",
+    )
+
+    agent = LogExtractorAgent(
+        {PlatformTag.CDP: connector},
+        cluster_hosts={"cdp-nn-02": "10.0.0.5"},
+    )
+    result = agent.run(state)
+
+    connector.query_logs.assert_not_called()
+    assert result.log_result is original_result  # unchanged
+    assert result.error is None
