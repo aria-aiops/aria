@@ -276,7 +276,7 @@ Extracts relevant log lines for the incident. Uses a two-tier strategy: log aggr
 
 ## Agent 3 — Classifier
 
-> **Status**: 🔜 M4 (ARI-63)
+> **Status**: ✅ Implemented (S7 — ARI-18, ARI-19, ARI-63)
 
 Classifies the incident root cause using LLM reasoning over the extracted log lines.
 
@@ -316,7 +316,7 @@ Classifies the incident root cause using LLM reasoning over the extracted log li
 }
 ```
 
-**Error classes**: `resource` (OOM, disk, CPU) | `network` | `auth` | `data` | `pipeline` | `db` | `unknown`  
+**Error classes**: `oom` | `cpu` | `disk` | `network` | `auth` | `db_lock` | `pipeline` | `unknown`  
 **Confidence bands**: `high` (≥0.7) | `medium` (0.5–0.69) | `low` (<0.5)
 
 ---

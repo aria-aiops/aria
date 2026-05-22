@@ -160,13 +160,17 @@ Time window: `opened_at − 30 min`. On empty result, retries once with a 60-min
 
 **Cloud stubs:** Databricks, AWS EMR, Azure Monitor — raise `NotImplementedError`, full implementations planned.
 
-### Agent 3 — Classifier ✅ Stub (real classifier in M4)
+### Agent 3 — Classifier ✅ Implemented
 
 **File**: `core/agents/classifier.py`
 
-Uses an LLM with a few-shot prompt to classify the root cause and assign a mandatory confidence score. Error classes: `OOM`, `CPU`, `disk`, `network`, `auth`, `database`, `pipeline`, `unknown`. Confidence band (`high/medium/low`) is always surfaced in notifications — a low-confidence result is never presented as definitive.
+Classifies the root cause of an incident from metadata and log evidence using LLM reasoning over the extracted log lines. Returns a `ClassificationResult` with mandatory confidence scoring — a low-confidence result is never presented as definitive (AC-05 compliance).
 
-The stub (M6) always returns `error_class="unknown"` with `ConfidenceBand.LOW` and `pending_log_request=None`. M4 drops in the real LLM-based implementation as a direct swap.
+**Error classes**: `oom` | `cpu` | `disk` | `network` | `auth` | `db_lock` | `pipeline` | `unknown`
+
+**Confidence bands**: `high` (≥0.7) | `medium` (0.5–0.69) | `low` (<0.5) — derived from the confidence float, never trusted from the LLM.
+
+Model is injected at construction via `LLMClientInterface` — fully provider-agnostic. Model name configured via `ARIA_AGENT3_MODEL`. When no LLM client is injected (dry-run mode), the agent falls back to stub behaviour (`error_class="unknown"`, LOW confidence) without crashing the pipeline.
 
 ### Agent 4 — Notifier ✅ Implemented
 
@@ -248,7 +252,7 @@ All responses are JSON. All errors use the same envelope — no HTML error pages
 |---|---|---|
 | Agent 1 — Incident Reader | `POST /api/v1/agent1/run` | ✅ Implemented |
 | Agent 2 — Log Extractor | `POST /api/v1/agent2/run` | ✅ Implemented |
-| Agent 3 — Classifier | `POST /api/v1/agent3/run` | 🔜 M4 (stub in pipeline) |
+| Agent 3 — Classifier | `POST /api/v1/agent3/run` | ✅ Implemented |
 | Agent 4 — Notifier | `POST /api/v1/agent4/run` | ✅ Implemented |
 | Agent 0 — Pipeline (full run) | `POST /api/v1/pipeline/run` | ✅ Implemented |
 
@@ -359,6 +363,7 @@ aria/
 │       ├── health.py
 │       ├── agent1.py          # ✅ POST /api/v1/agent1/run
 │       ├── agent2.py          # ✅ POST /api/v1/agent2/run
+│       ├── agent3.py          # ✅ POST /api/v1/agent3/run
 │       ├── agent4.py          # ✅ POST /api/v1/agent4/run
 │       └── pipeline.py        # ✅ POST /api/v1/pipeline/run
 ├── core/                      # Pure Python, zero cloud dependencies
@@ -455,7 +460,7 @@ Phase 1 is complete when all of the following pass on 10 consecutive test incide
 | Phase 1 | M3: Agent 2 + log connectors (CDP, GCP) + stubs + REST API | ✅ Done |
 | Phase 1 | M3.5: Restructure + cloud connectors (Databricks, AWS, Azure) + vault + vector KB | ✅ Done |
 | Phase 1 | S5.5: LLM mode selector + Agent 2 optional LLM query planning (`LogQueryPlan`) | ✅ Done |
-| Phase 1 | M4: Agent 3 — LLM-based classifier with confidence scoring | 🔜 Planned |
+| Phase 1 | M4: Agent 3 — LLM-based classifier with confidence scoring | ✅ Done |
 | Phase 1 | M5: Agent 4 — Notifier (Slack/Teams/Google Chat) | ✅ Done |
 | Phase 1 | M6: Orchestration + ReAct loop — full pipeline | ✅ Done |
 | Phase 1 | M7: Acceptance testing — all 6 criteria passing | 🔜 Planned |
