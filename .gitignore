@@ -35,6 +35,9 @@ LICENSE
 # Backup / scratch files
 *_v1backup.md
 
+# Generated test data (output of scripts/create_dod_test_data.py)
+data/dod_incident_mapping.json
+
 # pytest
 .pytest_cache/
 .coverage

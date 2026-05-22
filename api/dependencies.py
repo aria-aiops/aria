@@ -164,13 +164,7 @@ def get_agent2() -> LogExtractorAgent:
             ssh_key_secret="CDP_SSH_KEY",
             ssh_user=cfg.cdp_ssh_user(),
             host_key_secret="CDP_HOST_KEY" if os.environ.get("CDP_HOST_KEY") else None,
-            log_dirs=[
-                "/var/log/hadoop-hdfs",
-                "/var/log/hadoop-yarn",
-                "/var/log/hive",
-                "/var/log/oozie",
-                "/var/log/spark",
-            ],
+            log_dirs=cfg.cdp_log_dirs(),
         ),
         PlatformTag.GCP: GCPLogConnector(vault),
     }
