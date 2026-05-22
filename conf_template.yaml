@@ -37,7 +37,13 @@ gcp:                        # only required when connectors.log = gcp
   bq_log_dataset: <your-bigquery-dataset>
 
 cdp:
-  ssh_user: hadoop           # OS user with read access to /var/log/hadoop-*
+  ssh_user: hadoop           # OS user with read access to log directories below
+  log_dirs:                  # directories searched for logs on CDP cluster nodes
+    - /var/log/hadoop-hdfs   # leave unset to use these defaults
+    - /var/log/hadoop-yarn
+    - /var/log/hive
+    - /var/log/oozie
+    - /var/log/spark
 
 slack:
   channel_id: <your-slack-channel-id>   # channel where Agent 4 posts notifications
