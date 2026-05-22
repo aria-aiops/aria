@@ -53,6 +53,15 @@ class AzureLogConnector(LogStoreInterface):
         workspace_id_secret: str = "AZURE_LOG_WORKSPACE_ID",
         log_table: str = "Syslog",
     ) -> None:
+        """Initialise the Azure Monitor log connector.
+
+        Args:
+            vault: Secret store for the Log Analytics workspace ID.
+            workspace_id_secret: Vault key name for the workspace GUID.
+                                 Defaults to 'AZURE_LOG_WORKSPACE_ID'.
+            log_table: KQL table to query. Defaults to 'Syslog' (Linux syslog).
+                       Override with 'Event' for Windows or custom table names for AKS/HDInsight.
+        """
         self._vault = vault
         self._workspace_id_secret = workspace_id_secret
         self._log_table = log_table
@@ -67,6 +76,27 @@ class AzureLogConnector(LogStoreInterface):
         log_paths: list[str] | None = None,
         max_results: int = 50,
     ) -> LogQueryResult:
+        """Query Azure Monitor Log Analytics via KQL and return parsed log lines.
+
+        Builds a KQL query against the configured table, filtered by Computer name,
+        severity level, and optional keywords. Auth failures raise LogStoreUnavailableError;
+        KQL query errors return an empty result.
+
+        Args:
+            host: Computer name (or partial name) to filter on in the KQL where clause.
+            platform_tag: Not used for filtering — passed through for traceability.
+            start_time: Start of the query window (passed as the timespan parameter).
+            end_time: End of the query window.
+            keywords: Optional keywords matched via SyslogMessage contains clauses.
+            log_paths: Not used — Azure Monitor does not support path-based filtering.
+            max_results: Maximum log lines to return.
+
+        Returns:
+            LogQueryResult — empty with LOW confidence on query failure.
+
+        Raises:
+            LogStoreUnavailableError: If Azure credentials cannot be obtained.
+        """
         from azure.core.exceptions import HttpResponseError, ServiceRequestError
         from azure.identity import DefaultAzureCredential
         from azure.monitor.query import LogsQueryClient, LogsQueryStatus
@@ -129,10 +159,28 @@ class AzureLogConnector(LogStoreInterface):
 
 
 def _escape_kql_string(value: str) -> str:
+    """Escape backslashes and double quotes for safe embedding in a KQL string literal."""
     return value.replace("\\", "\\\\").replace('"', '\\"')
 
 
 def _build_kql(table: str, host: str, keywords: list[str] | None, limit: int) -> str:
+    """Build a KQL query string for querying a Log Analytics table by host and keywords.
+
+    The host is validated against a safe character allowlist to prevent KQL injection.
+    Keywords are escaped and joined as OR-combined contains clauses (max 10, max 100 chars each).
+
+    Args:
+        table: KQL table name (e.g. 'Syslog').
+        host: Computer name to filter on.
+        keywords: Optional list of keyword strings to match in SyslogMessage.
+        limit: Maximum number of rows to return (applied as a KQL limit clause).
+
+    Returns:
+        A multi-line KQL query string.
+
+    Raises:
+        ValueError: If the host value contains characters unsafe for KQL.
+    """
     if not _SAFE_HOST_RE.match(host):
         raise ValueError(f"Invalid host value for KQL query: {host!r}")
     safe_host = _escape_kql_string(host)
@@ -156,6 +204,15 @@ def _build_kql(table: str, host: str, keywords: list[str] | None, limit: int) ->
 
 
 def _row_to_log_line(row: dict, host: str) -> LogLine | None:
+    """Convert a KQL result row dict to a LogLine.
+
+    Args:
+        row: Dict of column name → value from a KQL result table row.
+        host: Fallback source value if the row has no Computer column.
+
+    Returns:
+        LogLine on success, None if the row is missing a timestamp or is otherwise unparseable.
+    """
     try:
         ts = row.get("TimeGenerated")
         if ts is None:
@@ -172,12 +229,14 @@ def _row_to_log_line(row: dict, host: str) -> LogLine | None:
 
 
 def _utc(dt: datetime) -> datetime:
+    """Attach UTC timezone to a naive datetime. No-op if the datetime is already tz-aware."""
     if dt.tzinfo is None:
         return dt.replace(tzinfo=timezone.utc)
     return dt
 
 
 def _empty(query_desc: str) -> LogQueryResult:
+    """Return a zero-result LogQueryResult for use when the Azure query fails or returns nothing."""
     return LogQueryResult(
         log_lines=[], query_executed=query_desc, total_scanned=0, confidence=ConfidenceBand.LOW
     )

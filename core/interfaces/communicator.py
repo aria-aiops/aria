@@ -10,6 +10,12 @@ from core.models import NotificationPayload
 
 
 class CommunicatorInterface(ABC):
+    """Contract for delivering a NotificationPayload to an external channel.
+
+    Each implementation (Slack, Teams, Google Chat, etc.) is responsible for
+    translating the platform-agnostic NotificationPayload into its own wire format.
+    """
+
     @abstractmethod
     def send(self, payload: NotificationPayload) -> str:
         """Send a notification.

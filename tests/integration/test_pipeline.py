@@ -42,6 +42,7 @@ class _StubLLM(LLMClientInterface):
 
 
 def _build_pipeline(communicator: InMemoryCommunicator | None = None) -> ARIAPipeline:
+    """Assemble a full ARIAPipeline backed by in-memory stubs and a deterministic LLM stub."""
     if communicator is None:
         communicator = InMemoryCommunicator()
 
@@ -83,7 +84,7 @@ def test_full_pipeline_happy_path():
 
 
 def test_full_pipeline_notification_is_not_partial():
-    """Stub classifier always returns a classification → is_partial=False."""
+    """Verify that the stub classifier always yields a classification, so is_partial is False."""
     comm = InMemoryCommunicator()
     pipeline = _build_pipeline(comm)
 
@@ -113,7 +114,7 @@ def test_full_pipeline_unknown_incident_agent4_cannot_notify():
 
 
 def test_stub_classifier_never_triggers_react_loop():
-    """Stub agent3 always sets pending_log_request=None → loop never fires."""
+    """Verify that the stub classifier always clears pending_log_request so the ReAct loop never fires."""
     pipeline = _build_pipeline()
 
     result = pipeline.run("INC0000001")

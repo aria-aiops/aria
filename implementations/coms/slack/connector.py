@@ -18,7 +18,19 @@ logger = logging.getLogger(__name__)
 
 
 class SlackConnector(CommunicatorInterface):
+    """CommunicatorInterface backed by the Slack Web API (slack_sdk.WebClient).
+
+    The bot token must have the chat:write scope. Phase 2 interactive buttons
+    (Approve/Reject) will reuse the same token via the Bolt app — no migration.
+    """
+
     def __init__(self, token: str, channel_id: str) -> None:
+        """Initialise the Slack client.
+
+        Args:
+            token: Slack bot token (xoxb-...) with chat:write scope.
+            channel_id: Target Slack channel ID (e.g. 'C01234ABCDE').
+        """
         self._client = WebClient(token=token)
         self._channel_id = channel_id
 

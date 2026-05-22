@@ -34,6 +34,19 @@ router = APIRouter(prefix="/agent2", tags=["Agent 2"])
 def _build_metadata_from_input(
     incident_number: str, meta_in: Agent2MetadataInput
 ) -> IncidentMetadata:
+    """Construct an IncidentMetadata stub from pre-supplied API input.
+
+    Used when the caller passes metadata directly to /agent2/run, bypassing Agent 1.
+    Non-critical fields (caller, short/long description, state) are filled with
+    placeholder values so Agent 2 can run without requiring a full incident record.
+
+    Args:
+        incident_number: The incident number used as the key.
+        meta_in: Pre-resolved metadata from the API request body.
+
+    Returns:
+        IncidentMetadata ready for Agent 2 consumption.
+    """
     try:
         platform_tag = PlatformTag(meta_in.platform_tag.lower())
     except ValueError:
@@ -60,6 +73,14 @@ def _build_metadata_from_input(
 
 @router.post("/run", response_model=Agent2Response)
 def run_agent2(request: Agent2RunRequest) -> Agent2Response:
+    """Run Agent 2 for the given incident number.
+
+    If metadata is provided in the request body, it is used directly.
+    Otherwise, Agent 1 is called first to resolve the incident before
+    Agent 2 retrieves log evidence.
+
+    Returns HTTP 503 if credentials are not configured, 500 on any agent error.
+    """
     t0 = time.monotonic()
     state = PipelineState(incident_number=request.incident_number)
 
@@ -164,6 +185,7 @@ def run_agent2(request: Agent2RunRequest) -> Agent2Response:
 
 @router.get("/health", response_model=AgentHealthResponse)
 def agent2_health() -> AgentHealthResponse:
+    """Check whether Agent 2's log connectors (CDP SSH key, GCP service account) are configured."""
     cdp_ready = bool(os.environ.get("CDP_SSH_KEY"))
     gcp_ready = bool(os.environ.get("GCP_SA_KEY") or cfg.gcp_project_id())
     connectors = []

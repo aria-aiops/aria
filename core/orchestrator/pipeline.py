@@ -33,6 +33,16 @@ _MAX_LOOP_ITERATIONS = 5
 
 
 class ARIAPipeline:
+    """The ARIA LangGraph pipeline — wires agents 1–4 into a directed state graph.
+
+    Responsibilities:
+      - Build the graph once at construction time and compile it.
+      - Expose a single run(incident_number) method that is the only public entry point.
+      - Handle the ReAct loop: Agent 3 can request more logs by setting
+        state.pending_log_request; the orchestrator routes back to Agent 2 up to
+        _MAX_LOOP_ITERATIONS times before forcing Agent 4 to notify.
+    """
+
     def __init__(
         self,
         agent1: "IncidentReaderAgent",
@@ -40,6 +50,14 @@ class ARIAPipeline:
         agent3: "ClassifierAgent",
         agent4: "NotifierAgent",
     ) -> None:
+        """Initialise the pipeline and compile the LangGraph state graph.
+
+        Args:
+            agent1: Incident Reader — fetches and resolves the incident from ITSM.
+            agent2: Log Extractor — retrieves log evidence from the target cluster.
+            agent3: Classifier — analyses log evidence and classifies the error.
+            agent4: Notifier — formats and delivers the notification to the channel.
+        """
         self._agent1 = agent1
         self._agent2 = agent2
         self._agent3 = agent3
@@ -53,6 +71,7 @@ class ARIAPipeline:
     # ------------------------------------------------------------------
 
     def _agent1_node(self, state: PipelineState) -> dict:
+        """LangGraph node wrapper for Agent 1. Returns only the fields it writes."""
         logger.info("pipeline: running agent1 for %s", state.incident_number)
         result = self._agent1.run(state)
         return {
@@ -61,6 +80,7 @@ class ARIAPipeline:
         }
 
     def _agent2_node(self, state: PipelineState) -> dict:
+        """LangGraph node wrapper for Agent 2. Increments loop_iterations and clears pending_log_request."""
         logger.info(
             "pipeline: running agent2 (iteration %d) for %s",
             state.loop_iterations + 1,
@@ -77,6 +97,7 @@ class ARIAPipeline:
         }
 
     def _agent3_node(self, state: PipelineState) -> dict:
+        """LangGraph node wrapper for Agent 3. Returns classification and any pending log request."""
         logger.info("pipeline: running agent3 for %s", state.incident_number)
         result = self._agent3.run(state)
         return {
@@ -85,6 +106,7 @@ class ARIAPipeline:
         }
 
     def _agent4_node(self, state: PipelineState) -> dict:
+        """LangGraph node wrapper for Agent 4. Returns notification_sent and any delivery error."""
         logger.info("pipeline: running agent4 for %s", state.incident_number)
         result = self._agent4.run(state)
         return {
@@ -113,6 +135,15 @@ class ARIAPipeline:
     # ------------------------------------------------------------------
 
     def _build_graph(self) -> "CompiledStateGraph[Any, Any, Any, Any]":
+        """Construct and compile the LangGraph StateGraph for the ARIA pipeline.
+
+        Graph topology (see module docstring for full ASCII diagram):
+          START → agent1 → (conditional) → agent2 → agent3 → (conditional) → agent4 → END
+          The conditional after agent3 creates the ReAct loop back to agent2.
+
+        Returns:
+            A compiled LangGraph graph ready for invoke().
+        """
         g = StateGraph(PipelineState)
 
         g.add_node("agent1", self._agent1_node)

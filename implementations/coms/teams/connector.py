@@ -23,6 +23,18 @@ _CONFIDENCE_COLORS: dict[ConfidenceBand | None, str] = {
 
 
 def _build_card(payload: NotificationPayload) -> dict[str, Any]:
+    """Build a Teams MessageCard dict from a NotificationPayload.
+
+    Uses the legacy MessageCard format (O365 Connector Card schema) because it
+    is universally supported. Adaptive Cards are not available for incoming webhooks
+    — only for bot-based integrations using the Workflows connector.
+
+    Args:
+        payload: The platform-agnostic notification data.
+
+    Returns:
+        A dict ready to POST as JSON to the Teams incoming webhook URL.
+    """
     color = _CONFIDENCE_COLORS.get(payload.confidence_band, "888888")
     title = f"ARIA Alert — {payload.incident_number} [{payload.priority}]"
 
@@ -79,7 +91,14 @@ def _build_card(payload: NotificationPayload) -> dict[str, Any]:
 
 
 class TeamsConnector(CommunicatorInterface):
+    """CommunicatorInterface backed by an MS Teams Incoming Webhook."""
+
     def __init__(self, webhook_url: str) -> None:
+        """Initialise the connector.
+
+        Args:
+            webhook_url: The full Incoming Webhook URL from the Teams channel connector settings.
+        """
         self._webhook_url = webhook_url
 
     def send(self, payload: NotificationPayload) -> str:

@@ -20,6 +20,16 @@ class AnthropicLLMClient(LLMClientInterface):
     """LLMClientInterface backed by the Anthropic Messages API."""
 
     def __init__(self, model: str) -> None:
+        """Initialise the client with the specified model and the ANTHROPIC_API_KEY env var.
+
+        Args:
+            model: Anthropic model ID (e.g. 'claude-sonnet-4-6'). Read from
+                   ARIA_AGENT1_MODEL / ARIA_GLOBAL_MODEL — never hardcoded here.
+
+        Raises:
+            ValueError: If ANTHROPIC_API_KEY is not set in the environment.
+            LLMAuthError: If the Anthropic SDK rejects the key at client construction.
+        """
         api_key = os.environ.get("ANTHROPIC_API_KEY")
         if not api_key:
             raise ValueError("ANTHROPIC_API_KEY environment variable is not set")
@@ -36,6 +46,23 @@ class AnthropicLLMClient(LLMClientInterface):
         temperature: float = 0.0,
         system: str | None = None,
     ) -> str:
+        """Send messages to the Anthropic Messages API and return the response text.
+
+        Args:
+            messages: Conversation turns — list of {'role': 'user'|'assistant', 'content': str}.
+            max_tokens: Upper bound on the response length in tokens.
+            temperature: 0.0 = deterministic, >0 = more creative. Agents use 0.0 for consistency.
+            system: Optional system prompt passed as a top-level parameter (Anthropic supports this
+                    separately from the messages list).
+
+        Returns:
+            Raw text of the first content block in the model's response.
+
+        Raises:
+            LLMAuthError: On authentication failure.
+            LLMUnavailableError: On network or API errors.
+            LLMResponseError: If the response has no content blocks.
+        """
         kwargs: dict = {
             "model": self._model,
             "max_tokens": max_tokens,

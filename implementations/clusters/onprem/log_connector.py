@@ -70,6 +70,22 @@ class SSHLogConnector(LogStoreInterface):
         timeout: int = 30,
         host_key_secret: str | None = None,
     ) -> None:
+        """Initialise the SSH log connector.
+
+        Args:
+            vault: Secret store used to retrieve the SSH private key (and optional host key).
+            ssh_key_secret: Vault key name for the PEM-encoded SSH private key.
+            ssh_user: SSH username on the target nodes (e.g. 'hadoop', 'admin').
+            log_dirs: List of directories to search for log files on the target host.
+                      When None, query_logs returns an empty result (no directories = no grep).
+            default_keywords: Keywords used for grep when no KB hints are available.
+                              Defaults to ERROR, WARN, FATAL, OOM, Exception, OutOfMemory.
+            ssh_port: SSH port. Defaults to 22.
+            timeout: SSH connection and command timeout in seconds. Defaults to 30.
+            host_key_secret: Vault key name for the base64-encoded SSH host public key.
+                             Required for strict host key checking. When None, connection
+                             is refused (RejectPolicy) — always provide this in production.
+        """
         self._vault = vault
         self._ssh_key_secret = ssh_key_secret
         self._ssh_user = ssh_user
@@ -91,6 +107,23 @@ class SSHLogConnector(LogStoreInterface):
         log_paths: list[str] | None = None,
         max_results: int = 50,
     ) -> LogQueryResult:
+        """SSH into the target host, grep log directories for keywords, and return parsed lines.
+
+        Never raises — SSH or grep failures return an empty result with LOW confidence
+        and log a WARNING so the pipeline continues.
+
+        Args:
+            host: Hostname or IP to SSH into.
+            platform_tag: Passed through to query_executed for traceability only.
+            start_time: Start of the time window. Lines outside this window are dropped.
+            end_time: End of the time window.
+            keywords: Keywords to grep for. Defaults to default_keywords if None.
+            log_paths: Directories to search. Overrides the connector's log_dirs if provided.
+            max_results: Maximum number of parsed log lines to return.
+
+        Returns:
+            LogQueryResult — empty with LOW confidence on SSH failure or no matching lines.
+        """
         dirs = log_paths or self._log_dirs or []
         kws = keywords or self._default_keywords
         query_desc = (
@@ -151,6 +184,23 @@ class SSHLogConnector(LogStoreInterface):
     # ── Internal ─────────────────────────────────────────────────────────────
 
     def _ssh_grep(self, host: str, dirs: list[str], keywords: list[str]) -> list[str]:
+        """Connect via SSH and run a grep across the configured log directories.
+
+        Constructs a single grep command that searches all directories at once
+        and tails the last _MAX_RAW_LINES lines to avoid transferring huge files.
+
+        Args:
+            host: Target hostname or IP.
+            dirs: List of log directories to grep.
+            keywords: List of keywords to match (OR-combined into a single regex).
+
+        Returns:
+            List of raw log line strings from stdout.
+
+        Raises:
+            ValueError: If host_key_secret is not set (security requirement).
+            Any SSH exception propagates to query_logs which handles it.
+        """
         key_pem = self._vault.get_secret(self._ssh_key_secret)
         pkey = _load_private_key(key_pem)
 
@@ -210,6 +260,14 @@ def _load_known_host_key(client: paramiko.SSHClient, hostname: str, pubkey_b64: 
 
 
 def _load_private_key(pem: str) -> paramiko.PKey:
+    """Try each known paramiko key class against the PEM string and return the first that succeeds.
+
+    DSSKey was removed in paramiko 3.x — guarded with hasattr to stay compatible
+    with both paramiko 2.x and 3.x without conditional imports.
+
+    Raises:
+        LogStoreUnavailableError: If no key class accepts the PEM data.
+    """
     # DSSKey was removed in paramiko 3.x — guard with hasattr
     _key_classes = [
         c for c in (paramiko.RSAKey, paramiko.Ed25519Key, paramiko.ECDSAKey) if c is not None
@@ -223,6 +281,18 @@ def _load_private_key(pem: str) -> paramiko.PKey:
 
 
 def _parse_line(raw: str, host: str) -> LogLine | None:
+    """Parse a single raw log line into a LogLine using the standard Hadoop/YARN log format.
+
+    Expected format: '2024-01-15 10:23:45,123 ERROR ClassName: message text'
+
+    Args:
+        raw: A single line of text from the SSH grep output.
+        host: Hostname used as the source field in the returned LogLine.
+
+    Returns:
+        LogLine on successful parse, None if the line doesn't match the pattern
+        or if the timestamp cannot be parsed.
+    """
     m = _LOG_LINE_RE.match(raw.strip())
     if not m:
         return None

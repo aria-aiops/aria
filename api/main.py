@@ -12,7 +12,7 @@ import logging
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from api.routers import agent1, agent2, agent4, health, pipeline
+from api.routers import agent1, agent2, agent3, agent4, health, pipeline
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +33,7 @@ app = FastAPI(
 app.include_router(health.router, prefix="/api/v1")
 app.include_router(agent1.router, prefix="/api/v1")
 app.include_router(agent2.router, prefix="/api/v1")
+app.include_router(agent3.router, prefix="/api/v1")
 app.include_router(agent4.router, prefix="/api/v1")
 app.include_router(pipeline.router, prefix="/api/v1")
 
@@ -41,6 +42,12 @@ app.include_router(pipeline.router, prefix="/api/v1")
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Catch-all exception handler that returns a JSON error envelope instead of HTML.
+
+    FastAPI's default error responses are HTML, which breaks API clients.
+    This handler converts all unhandled exceptions into the standard ARIA
+    { status, agent, incident_number, duration_ms, data, error } envelope.
+    """
     logger.exception("Unhandled exception for %s %s", request.method, request.url)
     return JSONResponse(
         status_code=500,

@@ -44,6 +44,14 @@ class CMDBResolver:
         timeout: int = 15,
         rel_type: str = "Members::Member of",
     ) -> None:
+        """Initialise the resolver with a ServiceNow instance and credentials.
+
+        Args:
+            instance: ServiceNow hostname (e.g. 'mycompany.service-now.com').
+            auth: HTTP Basic Auth credentials for the ServiceNow REST API.
+            timeout: Request timeout in seconds. Defaults to 15.
+            rel_type: CMDB relationship type used to traverse cluster→node membership.
+        """
         self._base = f"https://{instance}/api/now/table"
         self._auth = auth
         self._timeout = timeout
@@ -51,6 +59,11 @@ class CMDBResolver:
 
     @classmethod
     def from_env(cls) -> "CMDBResolver":
+        """Construct a CMDBResolver from environment variables and conf.yaml.
+
+        Reads SNOW_INSTANCE, SNOW_USER, SNOW_PASSWORD from the environment.
+        Raises ValueError if any required variable is missing.
+        """
         instance = cfg.snow_instance()
         user = cfg.snow_user()
         password = os.environ.get("SNOW_PASSWORD", "")
@@ -181,6 +194,9 @@ class CMDBResolver:
             )
             resp.raise_for_status()
             results = resp.json().get("result", [])
+
+            # Extract the child CI name from each relationship record.
+            # The 'child' field is a dict when sysparm_display_value=true.
             names = []
             for r in results:
                 child = r.get("child", {})
@@ -192,5 +208,8 @@ class CMDBResolver:
             logger.warning("CMDBResolver.resolve failed for %r: %s", cluster_name, exc)
             return []
 
+        # Resolve the IP of each node in a separate CMDB call.
+        # This adds N HTTP calls but is acceptable because resolve() is called
+        # at most once per incident and nodes are always needed for SSH.
         resources = [AffectedResource(name=n, ip_address=self.get_ip(n)) for n in names]
         return resources

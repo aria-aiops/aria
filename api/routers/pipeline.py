@@ -22,6 +22,13 @@ router = APIRouter(prefix="/pipeline", tags=["Pipeline"])
 
 @router.post("/run", response_model=PipelineResponse)
 def run_pipeline(request: PipelineRunRequest) -> PipelineResponse:
+    """Run the full ARIA pipeline (Agents 1–4) for the given incident number.
+
+    Always returns HTTP 200 with a PipelineResponse — the pipeline is designed to
+    never crash and instead surfaces errors inside the response body (error field).
+    HTTP 503 is returned only when the pipeline itself cannot be constructed
+    (i.e. required env vars like ARIA_AGENT1_MODEL are missing).
+    """
     t0 = time.monotonic()
 
     try:
@@ -67,6 +74,7 @@ def run_pipeline(request: PipelineRunRequest) -> PipelineResponse:
 
 @router.get("/health", response_model=AgentHealthResponse)
 def pipeline_health() -> AgentHealthResponse:
+    """Check pipeline readiness — requires at minimum ARIA_AGENT1_MODEL to be configured."""
     model1 = cfg.resolve_model("1")
     dry = cfg.dry_run()
     status = "ready" if model1 else "degraded"

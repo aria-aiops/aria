@@ -96,6 +96,18 @@ class IncidentReaderAgent:
         cmdb_resolver: "Any | None" = None,
         knowledge_base: KnowledgeBaseInterface | None = None,
     ) -> None:
+        """Initialise Agent 1 with its required and optional dependencies.
+
+        Args:
+            connector: ITSM connector used to fetch the raw incident record.
+            llm_client: LLM client for CI extraction (Paths 2 and 3) and
+                        fallback platform_tag detection.
+            cmdb_resolver: Optional CMDB resolver. Without it, Path 1 and
+                           Path 2 CI resolution are unavailable — every incident
+                           falls through to Path 3 (LLM-only extraction).
+            knowledge_base: Optional KB. Provides service hints for Path 2
+                            cluster→service resolution.
+        """
         self._connector = connector
         self._llm = llm_client
         self._cmdb = cmdb_resolver

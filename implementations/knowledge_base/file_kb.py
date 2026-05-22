@@ -36,6 +36,14 @@ class FileKnowledgeBase(KnowledgeBaseInterface):
     """
 
     def __init__(self, runbook_dir: str) -> None:
+        """Load all .md/.txt runbook files from the given directory at construction time.
+
+        Args:
+            runbook_dir: Path to the directory containing runbook files.
+
+        Raises:
+            KnowledgeBaseError: If the directory does not exist.
+        """
         path = Path(runbook_dir)
         if not path.is_dir():
             raise KnowledgeBaseError(f"Runbook directory not found: {runbook_dir}")
@@ -86,6 +94,14 @@ class FileKnowledgeBase(KnowledgeBaseInterface):
 
     @staticmethod
     def _load(directory: Path) -> dict[str, str]:
+        """Recursively read all .md and .txt files into a dict keyed by lowercased file stem.
+
+        Args:
+            directory: Root directory to search.
+
+        Returns:
+            Dict mapping file stem (e.g. 'hive-metastore') to file content string.
+        """
         files: dict[str, str] = {}
         for pattern in ("**/*.md", "**/*.txt"):
             for p in directory.glob(pattern):
@@ -94,6 +110,11 @@ class FileKnowledgeBase(KnowledgeBaseInterface):
 
 
 def _tokenize(text: str) -> set[str]:
+    """Split text into a set of lowercased tokens, ignoring words shorter than 3 characters.
+
+    Short words (stop words, prepositions) are dropped because they add noise to
+    token-overlap scoring without improving relevance.
+    """
     return {w.lower() for w in re.findall(r"\w+", text) if len(w) > 2}
 
 

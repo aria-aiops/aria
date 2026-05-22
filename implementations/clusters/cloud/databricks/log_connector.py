@@ -63,6 +63,13 @@ class DatabricksLogConnector(LogStoreInterface):
         host_secret: str = "DATABRICKS_HOST",
         token_secret: str = "DATABRICKS_TOKEN",
     ) -> None:
+        """Initialise the Databricks log connector.
+
+        Args:
+            vault: Secret store for retrieving the workspace URL and access token.
+            host_secret: Vault key for the Databricks workspace URL. Defaults to 'DATABRICKS_HOST'.
+            token_secret: Vault key for the personal access token. Defaults to 'DATABRICKS_TOKEN'.
+        """
         self._vault = vault
         self._host_secret = host_secret
         self._token_secret = token_secret
@@ -77,6 +84,27 @@ class DatabricksLogConnector(LogStoreInterface):
         log_paths: list[str] | None = None,
         max_results: int = 50,
     ) -> LogQueryResult:
+        """Fetch cluster events from the Databricks Events API and return them as log lines.
+
+        The 'host' parameter is treated as the Databricks cluster ID (e.g. '0112-150803-qlq5b01n').
+        A lightweight GET /clusters/get call is made first to verify auth and cluster existence
+        before fetching events.
+
+        Args:
+            host: Databricks cluster ID used to query the Events API.
+            platform_tag: Not used for filtering — passed through for traceability.
+            start_time: Start of the event window (converted to epoch milliseconds).
+            end_time: End of the event window.
+            keywords: Optional keyword filter applied to the event message after fetching.
+            log_paths: Not used — Databricks log access is event-based, not path-based.
+            max_results: Maximum log lines to return.
+
+        Returns:
+            LogQueryResult — empty with LOW confidence on API failure.
+
+        Raises:
+            LogStoreUnavailableError: On auth failure (HTTP 401) or workspace unreachable.
+        """
         db_host = self._vault.get_secret(self._host_secret).rstrip("/")
         token = self._vault.get_secret(self._token_secret)
 
@@ -137,6 +165,22 @@ def _fetch_events(
     end_time: datetime,
     limit: int,
 ) -> list[LogLine]:
+    """Call the Databricks POST /api/2.0/clusters/events endpoint and parse the results.
+
+    Time bounds are converted to epoch milliseconds as required by the Databricks API.
+    The limit is capped at 500 (Databricks API maximum per request).
+
+    Args:
+        db_host: Databricks workspace base URL (no trailing slash).
+        headers: HTTP headers including the Bearer token.
+        cluster_id: The cluster to fetch events for.
+        start_time: Start of the event window.
+        end_time: End of the event window.
+        limit: Maximum number of events to request (capped at 500).
+
+    Returns:
+        List of parsed LogLine objects. Empty list on any API error.
+    """
     start_ms = int(_utc(start_time).timestamp() * 1000)
     end_ms = int(_utc(end_time).timestamp() * 1000)
 
@@ -169,6 +213,18 @@ def _fetch_events(
 
 
 def _event_to_log_line(event: dict, cluster_id: str) -> LogLine | None:
+    """Convert a Databricks cluster event dict to a LogLine.
+
+    Maps known error-level event types (CLUSTER_CRASHED, DRIVER_NOT_RESPONDING, etc.)
+    to 'ERROR' and warn-level events to 'WARN'. All others map to 'INFO'.
+
+    Args:
+        event: A single event dict from the Databricks Events API response.
+        cluster_id: Used as the source field in the returned LogLine.
+
+    Returns:
+        LogLine on success, None if the event has no timestamp or is malformed.
+    """
     try:
         ts_ms = event.get("timestamp")
         if ts_ms is None:
@@ -193,12 +249,14 @@ def _event_to_log_line(event: dict, cluster_id: str) -> LogLine | None:
 
 
 def _utc(dt: datetime) -> datetime:
+    """Attach UTC timezone to a naive datetime. No-op if the datetime is already tz-aware."""
     if dt.tzinfo is None:
         return dt.replace(tzinfo=timezone.utc)
     return dt
 
 
 def _empty(query_desc: str) -> LogQueryResult:
+    """Return a zero-result LogQueryResult for use when the Databricks query fails or returns nothing."""
     return LogQueryResult(
         log_lines=[], query_executed=query_desc, total_scanned=0, confidence=ConfidenceBand.LOW
     )

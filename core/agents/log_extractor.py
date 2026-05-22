@@ -67,11 +67,34 @@ class LogExtractorAgent:
         knowledge_base: KnowledgeBaseInterface | None = None,
         llm_client: LLMClientInterface | None = None,
     ) -> None:
+        """Initialise Agent 2 with its connector registry and optional dependencies.
+
+        Args:
+            connector_registry: Maps PlatformTag → LogStoreInterface implementation.
+                                Platforms not in the registry return empty results silently.
+            knowledge_base: Optional KB used by LLM planning and Tier 2 static routing
+                            to retrieve log paths and keywords for a service.
+            llm_client: Optional LLM client for query planning (ARI-74/75). When None,
+                        Agent 2 falls back to static platform_tag-based routing.
+        """
         self._registry = connector_registry
         self._kb = knowledge_base
         self._llm = llm_client
 
     def run(self, state: PipelineState) -> PipelineState:
+        """Run log extraction for the incident in the current pipeline state.
+
+        Determines the correct SSH/API target from incident metadata, optionally
+        generates a LogQueryPlan via LLM, dispatches the appropriate connector,
+        and writes the result back to state.log_result.
+
+        Args:
+            state: Current pipeline state. Must contain incident_metadata from Agent 1.
+
+        Returns:
+            Updated state with log_result and log_query_plan populated.
+            On error, state.error is set and the method returns without raising.
+        """
         if not state.incident_metadata:
             state.error = "Agent 2: no incident metadata in pipeline state"
             return state
@@ -197,6 +220,17 @@ class LogExtractorAgent:
         ssh_host: str,
         plan: LogQueryPlan | None = None,
     ) -> LogQueryResult:
+        """Fetch logs for a single target host using either the LLM plan or static routing.
+
+        Args:
+            metadata: Incident metadata (provides platform_tag and opened_at).
+            ssh_host: Resolved hostname or IP to query logs from.
+            plan: Optional LLM-generated query plan. When provided, its connector,
+                  paths, keywords, and time window override static routing.
+
+        Returns:
+            LogQueryResult with matched lines. Never raises — errors return empty results.
+        """
         platform_tag = metadata.platform_tag or PlatformTag.UNKNOWN
         opened_at = metadata.opened_at
         service_name = metadata.affected_ci or ssh_host
@@ -300,6 +334,23 @@ class LogExtractorAgent:
         keywords: list[str] | None,
         log_paths: list[str] | None,
     ) -> LogQueryResult:
+        """Invoke a connector's query_logs() with a computed time window.
+
+        Calculates start = opened_at − window_minutes and end = opened_at + POST_WINDOW,
+        then delegates to the connector. Returns an empty result on any connector failure.
+
+        Args:
+            connector: The log store connector to use.
+            host: Target hostname or IP.
+            platform_tag: Platform routing tag passed through to the connector.
+            opened_at: Incident open timestamp used as the anchor for the window.
+            window_minutes: How many minutes before opened_at to start the query.
+            keywords: Optional keyword filter list.
+            log_paths: Optional log path list.
+
+        Returns:
+            LogQueryResult — empty with LOW confidence on connector failure.
+        """
         start = opened_at - timedelta(minutes=window_minutes)
         end = opened_at + timedelta(minutes=_POST_WINDOW)
         try:
@@ -317,6 +368,7 @@ class LogExtractorAgent:
 
 
 def _empty(host: str, platform_tag: PlatformTag) -> LogQueryResult:
+    """Return a zero-result LogQueryResult for a host, used when a connector fails or has no data."""
     return LogQueryResult(
         log_lines=[],
         query_executed=f"empty://{platform_tag.value}/{host}",

@@ -66,7 +66,7 @@ def test_connector_reads_incident(connector):
 
 
 def test_connector_incident_has_required_fields(connector):
-    """All fields ARIA depends on are present and correctly typed."""
+    """Verify that all fields ARIA depends on are present and correctly typed in the real response."""
     result = connector.read_incident(TEST_INCIDENT)
 
     # These are the fields Agent 1 guarantees to downstream agents
@@ -82,7 +82,7 @@ def test_connector_incident_has_required_fields(connector):
 
 
 def test_connector_list_recent_returns_results(connector):
-    """list_recent_incidents returns at least one incident."""
+    """Verify that list_recent_incidents returns at least one IncidentMetadata from ServiceNow."""
     results = connector.list_recent_incidents(limit=5)
 
     assert isinstance(results, list)
@@ -91,7 +91,7 @@ def test_connector_list_recent_returns_results(connector):
 
 
 def test_connector_list_recent_ordered_by_date(connector):
-    """list_recent_incidents returns incidents most-recent first."""
+    """Verify that list_recent_incidents returns incidents in descending date order."""
     results = connector.list_recent_incidents(limit=5)
 
     if len(results) >= 2:

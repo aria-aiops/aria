@@ -11,6 +11,8 @@ from typing import Any, Optional
 
 
 class Priority(str, Enum):
+    """ServiceNow incident priority levels. P1 is most critical, P4 is lowest."""
+
     P1 = "P1"
     P2 = "P2"
     P3 = "P3"
@@ -18,6 +20,12 @@ class Priority(str, Enum):
 
 
 class PlatformTag(str, Enum):
+    """The data platform a CI or incident belongs to.
+
+    Used by Agent 1 (extraction/routing) and Agent 2 (connector dispatch).
+    UNKNOWN means the platform could not be determined from the incident text.
+    """
+
     CDP = "cdp"
     DATABRICKS = "databricks"
     ORACLE = "oracle"
@@ -29,12 +37,21 @@ class PlatformTag(str, Enum):
 
 
 class ConfidenceBand(str, Enum):
+    """Human-readable confidence tier derived from a 0–1 float score.
+
+    HIGH  >= 0.7  — classifier is certain; surface as definitive in notifications.
+    MEDIUM 0.5–0.69 — plausible; surface as probable.
+    LOW   < 0.5  — guessing; always flag as low-confidence in notifications.
+    """
+
     HIGH = "high"  # >= 0.7
     MEDIUM = "medium"  # 0.5 – 0.69
     LOW = "low"  # < 0.5
 
 
 class ApprovalStatus(str, Enum):
+    """Status of the human approval gate used in Phase 2 interactive flows."""
+
     PENDING = "pending"
     APPROVED = "approved"
     REJECTED = "rejected"

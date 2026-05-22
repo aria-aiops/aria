@@ -18,4 +18,5 @@ _AGENTS = {
 
 @router.get("/health", response_model=HealthResponse)
 def health() -> HealthResponse:
+    """Return overall service health status, version, and per-agent readiness summary."""
     return HealthResponse(status="ok", version=_VERSION, agents=_AGENTS)

@@ -23,6 +23,14 @@ _CONFIDENCE_COLORS: dict[ConfidenceBand | None, str] = {
 
 
 def _build_card(payload: NotificationPayload) -> dict[str, Any]:
+    """Build a Google Chat Card v2 dict from a NotificationPayload.
+
+    Args:
+        payload: The platform-agnostic notification data.
+
+    Returns:
+        A dict with a 'cards' key, ready to POST as JSON to the webhook URL.
+    """
     title = f"ARIA Alert — {payload.incident_number} [{payload.priority}]"
 
     widgets: list[dict[str, Any]] = []
@@ -75,7 +83,14 @@ def _build_card(payload: NotificationPayload) -> dict[str, Any]:
 
 
 class GoogleChatConnector(CommunicatorInterface):
+    """CommunicatorInterface backed by a Google Chat Incoming Webhook."""
+
     def __init__(self, webhook_url: str) -> None:
+        """Initialise the connector.
+
+        Args:
+            webhook_url: The full Incoming Webhook URL from the Google Chat space settings.
+        """
         self._webhook_url = webhook_url
 
     def send(self, payload: NotificationPayload) -> str:
