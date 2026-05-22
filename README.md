@@ -154,6 +154,8 @@ Time window: `opened_at − 30 min`. On empty result, retries once with a 60-min
 
 **Optional LLM query planning**: when `agent2` is set in `conf.yaml`, Agent 2 calls the LLM before connector dispatch to produce a `LogQueryPlan` — choosing the connector, log paths, keywords, and time window for the specific incident. Falls back silently to static `platform_tag → connector` routing on any LLM failure. The plan is exposed in the API response as `log_query_plan`.
 
+**Cross-service log resolution (ReAct loop)**: when Agent 3 signals that evidence points to a different host, Agent 2 re-runs with a `pending_log_request`. It resolves the named CI to an IP via `data/cluster_hosts.json`, fetches logs from that host, and **merges** the new lines with the existing `log_result` so Agent 3 receives all evidence on the next pass.
+
 **Implemented connectors:**
 - `SSHLogConnector` (`implementations/clusters/onprem/`) — provider-agnostic SSH connector for any on-premise cluster (CDP, HDP, Oracle RAC, MapR, etc.). Log dirs and SSH credentials are constructor params.
 - `GCPLogConnector` (`implementations/clusters/cloud/gcp/`) — Cloud Logging API with vault-backed service account.
@@ -171,6 +173,8 @@ Classifies the root cause of an incident from metadata and log evidence using LL
 **Confidence bands**: `high` (≥0.7) | `medium` (0.5–0.69) | `low` (<0.5) — derived from the confidence float, never trusted from the LLM.
 
 Model is injected at construction via `LLMClientInterface` — fully provider-agnostic. Model name configured via `ARIA_AGENT3_MODEL`. When no LLM client is injected (dry-run mode), the agent falls back to stub behaviour (`error_class="unknown"`, LOW confidence) without crashing the pipeline.
+
+**ReAct loop trigger**: when log evidence explicitly names a different host as the root cause, the LLM sets a `log_request` field in its response instead of classifying. Agent 3 writes this to `state.pending_log_request` and returns without a classification — the orchestrator routes back to Agent 2 for a targeted cross-service log fetch. The loop is capped at 5 iterations.
 
 ### Agent 4 — Notifier ✅ Implemented
 
@@ -463,6 +467,7 @@ Phase 1 is complete when all of the following pass on 10 consecutive test incide
 | Phase 1 | M4: Agent 3 — LLM-based classifier with confidence scoring | ✅ Done |
 | Phase 1 | M5: Agent 4 — Notifier (Slack/Teams/Google Chat) | ✅ Done |
 | Phase 1 | M6: Orchestration + ReAct loop — full pipeline | ✅ Done |
+| Phase 1 | S8: ReAct loop trigger — Agent 3 fires cross-service log requests, Agent 2 resolves and merges | ✅ Done |
 | Phase 1 | M7: Acceptance testing — all 6 criteria passing | 🔄 In progress |
 | Phase 2 | Human validation gate + write-back to ServiceNow | 💡 Planned |
 | Phase 3 | Autonomous mode with auto-acknowledgement (MTTA impact) | 💡 Vision |

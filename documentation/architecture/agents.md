@@ -132,7 +132,11 @@ Uses an LLM with a few-shot prompt to classify the root cause and assign a confi
 
 ### ReAct loop with Agent 2
 
-If the classifier determines that the log evidence is insufficient, it signals Agent 2 to run an additional targeted query. This loop runs in-memory and repeats until the classifier has enough evidence or the iteration budget is exhausted.
+When log lines explicitly name a different host as the root cause (e.g. a DataNode log referencing a NameNode hostname), the LLM returns a `log_request` field in its JSON response instead of a classification. Agent 3 writes this to `state.pending_log_request` — carrying the server name exactly as it appeared in the logs — and returns without setting `state.classification`.
+
+The orchestrator detects the non-null `pending_log_request` and routes back to Agent 2. Agent 2 resolves the named CI to an IP via `data/cluster_hosts.json` (substring match against the request string), fetches logs from that host, and **merges** the new lines with the existing `log_result` so Agent 3 sees full combined evidence on the next pass.
+
+The loop repeats until Agent 3 produces a classification or the iteration budget (5) is exhausted. On budget exhaustion, the pipeline routes to Agent 4 with `classification = None` and `is_partial = True`.
 
 ---
 
