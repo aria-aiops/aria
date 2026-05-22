@@ -351,9 +351,7 @@ class LogExtractorAgent:
                 return ci_name, ip
         return None
 
-    def _run_for_log_request(
-        self, state: PipelineState, log_request: LogRequest
-    ) -> PipelineState:
+    def _run_for_log_request(self, state: PipelineState, log_request: LogRequest) -> PipelineState:
         """Handle a ReAct loop re-entry: fetch logs for the cross-service target named in the request.
 
         Resolves the CI name in the request string to an IP via cluster_hosts, fetches

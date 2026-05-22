@@ -303,9 +303,7 @@ def _build_loop_pipeline(
         llm_client=_StubLLM(),
     )
     agent2 = LogExtractorAgent(
-        connector_registry={
-            PlatformTag.CDP: InMemoryLogStore(log_lines=_LOOP_LOG_ENTRIES)
-        },
+        connector_registry={PlatformTag.CDP: InMemoryLogStore(log_lines=_LOOP_LOG_ENTRIES)},
         cluster_hosts=_CLUSTER_HOSTS,
     )
     agent3 = ClassifierAgent(llm_client=agent3_llm)

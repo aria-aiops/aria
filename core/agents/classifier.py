@@ -179,9 +179,7 @@ class ClassifierAgent:
         )
         return [{"role": "user", "content": content}]
 
-    def _parse_response(
-        self, raw: str
-    ) -> tuple[ClassificationResult | None, LogRequest | None]:
+    def _parse_response(self, raw: str) -> tuple[ClassificationResult | None, LogRequest | None]:
         """Parse the LLM's raw JSON response into either a classification or a log request.
 
         When the response contains a non-null log_request field, Agent 3 is signalling
@@ -240,14 +238,17 @@ class ClassifierAgent:
 
         confidence = max(0.0, min(1.0, confidence))
 
-        return ClassificationResult(
-            error_class=error_class,
-            error_label=str(data["error_label"]),
-            confidence=confidence,
-            confidence_band=self._band_from_score(confidence),
-            supporting_evidence=list(data.get("supporting_evidence") or []),
-            recommended_actions=list(data.get("recommended_actions") or []),
-        ), None
+        return (
+            ClassificationResult(
+                error_class=error_class,
+                error_label=str(data["error_label"]),
+                confidence=confidence,
+                confidence_band=self._band_from_score(confidence),
+                supporting_evidence=list(data.get("supporting_evidence") or []),
+                recommended_actions=list(data.get("recommended_actions") or []),
+            ),
+            None,
+        )
 
     @staticmethod
     def _band_from_score(score: float) -> ConfidenceBand:
