@@ -1,0 +1,7 @@
+project_id            = "aria-uc2-dataproc"
+billing_account       = "XXXXXX-XXXXXX-XXXXXX"
+region                = "europe-west1"
+zone                  = "europe-west1-b"
+
+# Get this from: terraform output -raw gke_node_sa_email (in aria-platform/)
+aria_gke_node_sa_email = "aria-gke-node-sa@aria-platform.iam.gserviceaccount.com"
