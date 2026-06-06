@@ -2,10 +2,10 @@
 
 > An AI-powered multi-agent system for automated incident triage, enrichment, and notification on data platform environments.
 
-![Status](https://img.shields.io/badge/status-Phase%201%20POC-orange)
+![Status](https://img.shields.io/badge/status-Phase%201.5%20Hardening-blue)
 ![Architecture](https://img.shields.io/badge/architecture-cloud--agnostic-blue)
 ![Python](https://img.shields.io/badge/python-3.11+-green)
-![License](https://img.shields.io/badge/license-MIT-lightgrey)
+![License](https://img.shields.io/badge/license-Apache%202.0-blue)
 
 ---
 
@@ -48,7 +48,7 @@ Key lessons absorbed from the community:
 
 ARIA is delivered across three distinct phases, each adding capability while maintaining architectural consistency.
 
-### Phase 1 — Notify-only mode (current POC)
+### Phase 1 — Notify-only mode ✅ Complete
 
 ARIA investigates and notifies. Human updates ticket manually.
 
@@ -58,6 +58,19 @@ New incident → Identify resource → Find logs → Classify error
 ```
 
 **Goal**: Build trust. Engineers see ARIA's findings, validate them in practice, understand system behavior.
+
+### Phase 1.5 — Production hardening (current)
+
+A 6-sprint bridge between the Phase 1 POC and Phase 2 production deployment. No new user-facing capabilities — this phase makes ARIA deployable, observable, and testable at scale.
+
+| Sprint | Focus |
+|--------|-------|
+| S1 | Structured logging (structlog, `run_id`, lifecycle events) |
+| S2 | Monitoring foundation — `RunRecord`, SQLite run store, REST API, Alpine.js dashboard, operating mode scaffold |
+| S3 | Docker packaging — `Dockerfile`, `ARIA_CONFIG_PATH` + ConfigMap pattern, `VertexAILLMClient`, LLM provider DI |
+| S4 | Testing infrastructure wiring — UC1/UC2/UC3 cluster setup, KB runbooks, CMDB validation |
+| S5 | Round 2 acceptance testing — 30 incidents across UC1 + UC2 on real simulated infrastructure |
+| S6 | GCP native service connectors — configurable resource type templates for BQ, Cloud Functions, Pub/Sub, GCS |
 
 ### Phase 2 — Human validation gate
 
@@ -299,7 +312,8 @@ ARIA targets **data platform environments** — on-premise (Cloudera CDP, Oracle
 │  clusters/cloud/   ← GCP / AWS / Databricks /   │
 │                      Azure                      │
 │  itsm/servicenow/  ← ServiceNowConnector        │
-│  vault/            ← EnvVarVault (+ HashiCorp)  │
+│  vault/            ← EnvVarVault · GCP SM ·     │
+│                      HashiCorp / AWS / Azure KV │
 │  memory/           ← Testing stubs              │
 └─────────────────────────────────────────────────┘
 ```
@@ -314,13 +328,13 @@ Every layer below is provider-agnostic — each is abstracted behind an interfac
 |---|---|---|
 | **Core engine** | — | Python 3.11+ |
 | Agent orchestration | — | LangGraph 0.2+ |
-| **LLM** | `LLMClientInterface` | Claude Sonnet 4.6 (Anthropic) |
+| **LLM** | `LLMClientInterface` | Claude Sonnet 4.6 (Anthropic API) · Vertex AI (Gemini / Claude-on-Vertex) — P1.5 S3 |
 | ITSM / incident source | `ConnectorInterface` | ServiceNow REST Table API |
 | Log store | `LogStoreInterface` | BigQuery + Cloud Storage (GCP) |
 | Notifications | `CommunicatorInterface` | Slack Bolt (`aria_bot`) + MS Teams Webhooks |
 | Queue | `QueueInterface` | In-memory (POC) — Pub/Sub planned |
 | State store | `StateStoreInterface` | In-memory (POC) — Firestore planned |
-| Secrets / vault | `VaultInterface` | Environment variables (POC) — HashiCorp Vault / cloud SM planned |
+| Secrets / vault | `VaultInterface` | Environment variables (POC) · GCP Secret Manager (P1.5 S3) · HashiCorp Vault / AWS SM / Azure KV |
 | Testing | — | pytest + fixtures |
 
 ---
@@ -363,13 +377,15 @@ aria/
 │   ├── main.py                # App entry point — uvicorn api.main:app
 │   ├── schemas.py             # Pydantic request/response models
 │   ├── dependencies.py        # Shared DI (agent singletons)
+│   ├── static/dashboard/      # Alpine.js dashboard (P1.5 S2)
 │   └── routers/               # One router per agent + health
 │       ├── health.py
 │       ├── agent1.py          # ✅ POST /api/v1/agent1/run
 │       ├── agent2.py          # ✅ POST /api/v1/agent2/run
 │       ├── agent3.py          # ✅ POST /api/v1/agent3/run
 │       ├── agent4.py          # ✅ POST /api/v1/agent4/run
-│       └── pipeline.py        # ✅ POST /api/v1/pipeline/run
+│       ├── pipeline.py        # ✅ POST /api/v1/pipeline/run
+│       └── monitoring.py      # P1.5 S2 — GET /api/v1/runs
 ├── core/                      # Pure Python, zero cloud dependencies
 │   ├── agents/                # Agent implementations
 │   ├── interfaces/            # ABCs: connector, log_store, llm_client, vault, knowledge_base, queue, state_store
@@ -391,7 +407,9 @@ aria/
 │   │   ├── slack/             # Slack Bolt client (aria_bot)
 │   │   └── teams/             # MS Teams webhook
 │   ├── llm/
-│   │   └── anthropic/         # AnthropicLLMClient
+│   │   ├── anthropic/         # AnthropicLLMClient
+│   │   ├── claude_code/       # ClaudeCodeLLMClient (local dev)
+│   │   └── vertex_ai/         # VertexAILLMClient — ADC auth (P1.5 S3)
 │   ├── vault/                 # EnvVarVault (+ HashiCorp, AWS SM, Azure KV)
 │   ├── knowledge_base/        # FileKnowledgeBase (+ Chroma/PGVector planned)
 │   └── memory/                # In-memory stubs for unit tests
@@ -399,11 +417,17 @@ aria/
 │   ├── unit/                  # Mock-based, no network required
 │   ├── integration/           # Require real external services
 │   └── fixtures/              # Sample incidents, CDP log fixtures (JSONL)
+├── deployment/
+│   └── monolithic/            # docker-compose + conf.yaml.example (P1.5 S3)
 ├── documentation/             # MkDocs site source (mkdocs serve)
-├── infra/                     # Terraform IaC
+├── infra/
+│   └── terraform/
+│       └── uc_testing/        # UC1 (Hadoop VMs) · UC2 (Dataproc) · UC3 (GCP native)
 ├── ml/                        # Datasets, few-shot prompt assets, evaluation scripts
-├── conf_template.yaml         # Non-secret config template — copy to conf.yaml
-├── .env.example               # Secrets template — copy to .env
+├── tests/acceptance/          # ground_truth.json · round results · AC reports
+├── Dockerfile                 # P1.5 S3 — python:3.11-slim, non-root, single stage
+├── conf_template.yaml         # Non-secret config — copy to conf.yaml (or mount as ConfigMap)
+├── .env.example               # Secrets template
 ├── requirements.txt
 └── README.md
 ```
@@ -466,9 +490,15 @@ Phase 1 is complete when all of the following pass on 10 consecutive test incide
 | Phase 1 | S5.5: LLM mode selector + Agent 2 optional LLM query planning (`LogQueryPlan`) | ✅ Done |
 | Phase 1 | M4: Agent 3 — LLM-based classifier with confidence scoring | ✅ Done |
 | Phase 1 | M5: Agent 4 — Notifier (Slack/Teams/Google Chat) | ✅ Done |
-| Phase 1 | M6: Orchestration + ReAct loop — full pipeline | ✅ Done |
-| Phase 1 | S8: ReAct loop trigger — Agent 3 fires cross-service log requests, Agent 2 resolves and merges | ✅ Done |
-| Phase 1 | M7: Acceptance testing — all 6 criteria passing | 🔄 In progress |
+| Phase 1 | M6: Orchestration + full pipeline | ✅ Done |
+| Phase 1 | S8: ReAct loop trigger — cross-service log requests | ✅ Done |
+| Phase 1 | M7: Acceptance criteria validated on local environment | ✅ Done |
+| **Phase 1.5** | **S1: Structured logging — structlog, `run_id`, lifecycle events** | 🔜 Next |
+| Phase 1.5 | S2: Monitoring foundation — run store, REST API, Alpine.js dashboard, mode scaffold | 🔜 Planned |
+| Phase 1.5 | S3: Docker + `ARIA_CONFIG_PATH` + `VertexAILLMClient` + LLM provider DI | 🔜 Planned |
+| Phase 1.5 | S4: Testing infrastructure — UC1/UC2/UC3 cluster wiring, KB runbooks, CMDB validation | 🔜 Planned |
+| Phase 1.5 | S5: Round 2 acceptance testing — 30 incidents on UC1 + UC2 real infrastructure | 🔜 Planned |
+| Phase 1.5 | S6: GCP native connectors — BQ, Cloud Functions, Pub/Sub, GCS | 🔜 Planned |
 | Phase 2 | Human validation gate + write-back to ServiceNow | 💡 Planned |
 | Phase 3 | Autonomous mode with auto-acknowledgement (MTTA impact) | 💡 Vision |
 
@@ -509,7 +539,7 @@ Contributions are welcome. See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelin
 
 ## License
 
-License terms are being defined. This project is not yet licensed for open use.
+Licensed under the [Apache License, Version 2.0](./LICENSE).
 
 ---
 

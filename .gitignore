@@ -29,9 +29,6 @@ conf.yaml
 # Internal docs (roadmap, specs — not part of public source)
 .docs/
 
-# License (pending finalisation)
-LICENSE
-
 # Backup / scratch files
 *_v1backup.md
 

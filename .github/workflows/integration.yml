@@ -16,6 +16,9 @@ on:
           - notifier
           - pipeline
 
+permissions:
+  contents: read
+
 jobs:
   integration:
     name: Integration tests (${{ github.event.inputs.suite }})
