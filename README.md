@@ -5,7 +5,7 @@
 ![Status](https://img.shields.io/badge/status-Phase%201.5%20Hardening-blue)
 ![Architecture](https://img.shields.io/badge/architecture-cloud--agnostic-blue)
 ![Python](https://img.shields.io/badge/python-3.11+-green)
-![License](https://img.shields.io/badge/license-MIT-lightgrey)
+![License](https://img.shields.io/badge/license-Apache%202.0-blue)
 
 ---
 
@@ -539,7 +539,7 @@ Contributions are welcome. See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelin
 
 ## License
 
-License terms are being defined. This project is not yet licensed for open use.
+Licensed under the [Apache License, Version 2.0](./LICENSE).
 
 ---
 
