@@ -37,10 +37,6 @@ SCHEMA_VERSION = "1.0"
 # Incident free-text fields that must never reach a log sink or the corpus.
 _PII_KEYS = ("long_description", "description", "raw_record", "caller")
 
-# Module-level guard so configure_logging() is safe to call from multiple entry
-# points (API import, pipeline construction, tests) without stacking handlers.
-_configured = False
-
 
 def _scrub_pii(logger: WrappedLogger, method_name: str, event_dict: EventDict) -> EventDict:
     """Redact incident free-text fields unless ARIA_LOG_PII=allow.
@@ -131,8 +127,12 @@ def configure_logging(force: bool = False) -> None:
         force: Rebuild the configuration even if already configured. Clears any
                handlers ARIA previously attached to the root logger.
     """
-    global _configured
-    if _configured and not force:
+    root = logging.getLogger()
+    # Idempotency is keyed on the real state — whether our managed handlers are
+    # already attached — rather than a module flag. Robust to module reloads and
+    # multiple entry points (API import, pipeline construction, tests).
+    already_configured = any(getattr(h, "_aria_managed", False) for h in root.handlers)
+    if already_configured and not force:
         return
 
     # structlog side: run the shared processors, then hand off to ProcessorFormatter
@@ -161,7 +161,6 @@ def configure_logging(force: bool = False) -> None:
     )
     file_handler.setFormatter(_build_formatter(json_output=True))
 
-    root = logging.getLogger()
     # Drop only handlers we own so a forced reconfigure doesn't duplicate sinks and
     # we don't stomp on pytest's caplog handler.
     for h in list(root.handlers):
@@ -171,5 +170,3 @@ def configure_logging(force: bool = False) -> None:
         setattr(h, "_aria_managed", True)
         root.addHandler(h)
     root.setLevel(level)
-
-    _configured = True
