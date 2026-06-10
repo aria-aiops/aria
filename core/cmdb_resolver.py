@@ -6,7 +6,6 @@ Used by Agent 1 to implement three-path CI resolution (ARI-46).
 ARI-45
 """
 
-import logging
 import os
 
 import requests
@@ -14,8 +13,9 @@ from requests.auth import HTTPBasicAuth
 
 import core.config as cfg
 from core.models import AffectedResource, CIClass
+from core.observability import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # ServiceNow sys_class_name → CIClass
 _CI_CLASS_MAP: dict[str, CIClass] = {

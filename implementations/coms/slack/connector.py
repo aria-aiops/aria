@@ -5,16 +5,15 @@ chat:write scope. Phase 2 interactive buttons (Approve/Reject) will use the same
 Bolt app instance — no migration required.
 """
 
-import logging
-
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 
 from core.interfaces.communicator import CommunicatorInterface
 from core.models import NotificationPayload
+from core.observability import get_logger
 from implementations.coms.slack.templates import build_attachment
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class SlackConnector(CommunicatorInterface):

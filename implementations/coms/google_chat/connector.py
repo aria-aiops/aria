@@ -4,15 +4,15 @@ Uses the Google Chat Card v2 format. The webhook URL is obtained from the Chat
 space settings (Space settings → Apps & Integrations → Add webhooks).
 """
 
-import logging
 from typing import Any
 
 import requests
 
 from core.interfaces.communicator import CommunicatorInterface
 from core.models import ConfidenceBand, NotificationPayload
+from core.observability import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 _CONFIDENCE_COLORS: dict[ConfidenceBand | None, str] = {
     ConfidenceBand.HIGH: "#2eb886",

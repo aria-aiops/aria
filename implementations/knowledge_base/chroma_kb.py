@@ -13,15 +13,15 @@ GPU / internet access.
 ARI-60
 """
 
-import logging
 import re
 from pathlib import Path
 
 from core.exceptions import KnowledgeBaseError
 from core.interfaces.knowledge_base import KnowledgeBaseInterface
 from core.models import LogAccessHint, PlatformTag
+from core.observability import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 _LOG_PATH_RE = re.compile(r"/[\w./-]*\.log[\w/.-]*|/var/log/[\w/.-]+")
 _KEYWORD_RE = re.compile(

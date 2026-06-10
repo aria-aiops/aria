@@ -10,7 +10,6 @@ ARI-47 / ARI-67
 """
 
 import io
-import logging
 import re
 import shlex
 from datetime import datetime
@@ -21,8 +20,9 @@ from core.exceptions import LogStoreUnavailableError
 from core.interfaces.log_store import LogStoreInterface
 from core.interfaces.vault import VaultInterface
 from core.models import ConfidenceBand, LogLine, LogQueryResult, PlatformTag
+from core.observability import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 _DEFAULT_KEYWORDS = ["ERROR", "WARN", "FATAL", "OOM", "Exception", "OutOfMemory"]
 

@@ -4,15 +4,15 @@ Uses the legacy MessageCard format (widely supported). Swap to Adaptive Cards
 when the target Teams environment supports the Workflows connector.
 """
 
-import logging
 from typing import Any
 
 import requests
 
 from core.interfaces.communicator import CommunicatorInterface
 from core.models import ConfidenceBand, NotificationPayload
+from core.observability import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 _CONFIDENCE_COLORS: dict[ConfidenceBand | None, str] = {
     ConfidenceBand.HIGH: "00b37a",  # green

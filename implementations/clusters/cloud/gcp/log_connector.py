@@ -12,7 +12,6 @@ ARI-48
 """
 
 import json
-import logging
 import re
 from datetime import datetime, timezone
 from typing import Any
@@ -21,8 +20,9 @@ from core.exceptions import LogStoreUnavailableError
 from core.interfaces.log_store import LogStoreInterface
 from core.interfaces.vault import VaultInterface
 from core.models import ConfidenceBand, LogLine, LogQueryResult, PlatformTag
+from core.observability import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 _SAFE_HOST_RE = re.compile(r"^[A-Za-z0-9._\-]+$")
 
