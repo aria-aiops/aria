@@ -9,11 +9,15 @@ Example:
 """
 
 import os
+import time
 
 import anthropic
 
 from core.exceptions import LLMAuthError, LLMResponseError, LLMUnavailableError
 from core.interfaces.llm_client import LLMClientInterface
+from core.observability import EVENT_LLM_CALL_COMPLETED, get_logger, record_llm_tokens
+
+logger = get_logger(__name__)
 
 
 class AnthropicLLMClient(LLMClientInterface):
@@ -71,6 +75,7 @@ class AnthropicLLMClient(LLMClientInterface):
         if system:
             kwargs["system"] = system
 
+        start = time.monotonic()
         try:
             response = self._client.messages.create(**kwargs)
         except anthropic.AuthenticationError as exc:
@@ -79,6 +84,19 @@ class AnthropicLLMClient(LLMClientInterface):
             raise LLMUnavailableError(str(exc)) from exc
         except anthropic.APIStatusError as exc:
             raise LLMUnavailableError(str(exc)) from exc
+
+        # Token accounting for cost/monitoring + the self-improvement corpus.
+        usage = getattr(response, "usage", None)
+        tokens_in = getattr(usage, "input_tokens", None)
+        tokens_out = getattr(usage, "output_tokens", None)
+        record_llm_tokens(tokens_in, tokens_out)
+        logger.info(
+            EVENT_LLM_CALL_COMPLETED,
+            model=self._model,
+            tokens_in=tokens_in,
+            tokens_out=tokens_out,
+            duration_ms=int((time.monotonic() - start) * 1000),
+        )
 
         if not response.content:
             raise LLMResponseError("Anthropic returned an empty response")

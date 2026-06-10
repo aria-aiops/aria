@@ -4,6 +4,7 @@ These dataclasses define the input/output contracts between agents.
 All agents communicate via these types — never raw dicts.
 """
 
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -210,6 +211,47 @@ class NotificationPayload:
     is_partial: bool
 
 
+class RunStatus(str, Enum):
+    """Terminal outcome of a pipeline run, recorded in the RunRecord.
+
+    SUCCESS — full pipeline completed and a notification was sent.
+    PARTIAL — an agent failed mid-pipeline but a partial notification still went out.
+    FAILED  — the run could not notify at all.
+    """
+
+    SUCCESS = "success"
+    PARTIAL = "partial"
+    FAILED = "failed"
+
+
+@dataclass
+class RunRecord:
+    """Per-run after-action summary — the monitoring/corpus unit of record (P1.5 S1).
+
+    Assembled by the orchestrator at the end of every run from the RunAccumulator
+    (per-agent timings, token totals) plus the final PipelineState. Emitted as the
+    ``pipeline_completed`` event and reused verbatim by the S2 monitoring store —
+    S2 adds persistence and serving, not new instrumentation.
+
+    Field set matches the S2 spec exactly. ``outcome`` stays None in Phase 1; it is
+    populated by the Phase 2 human Approve/Reject gate.
+    """
+
+    run_id: str
+    incident_number: str
+    start_time: datetime
+    end_time: datetime
+    status: RunStatus
+    current_agent: str | None
+    per_agent_durations: dict[str, int]
+    total_tokens_in: int
+    total_tokens_out: int
+    confidence: float | None
+    error_class: str | None
+    react_loop_iterations: int
+    outcome: str | None = None
+
+
 @dataclass
 class PipelineState:
     """Shared state passed between LangGraph nodes.
@@ -220,6 +262,9 @@ class PipelineState:
     """
 
     incident_number: str
+    # Stable identity for the whole run — generated at construction (pipeline entry),
+    # bound into every log event, and carried into the RunRecord. (P1.5 S1)
+    run_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     incident_metadata: IncidentMetadata | None = None
     log_result: LogQueryResult | None = None
     log_query_plan: LogQueryPlan | None = None

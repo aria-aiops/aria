@@ -7,15 +7,15 @@ via regex. No network, no vector DB — safe for unit tests and local dev.
 ARI-59
 """
 
-import logging
 import re
 from pathlib import Path
 
 from core.exceptions import KnowledgeBaseError
 from core.interfaces.knowledge_base import KnowledgeBaseInterface
 from core.models import LogAccessHint, PlatformTag
+from core.observability import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 _HIGH_SCORE = 0.15
 _MEDIUM_SCORE = 0.05

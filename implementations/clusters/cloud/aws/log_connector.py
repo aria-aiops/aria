@@ -11,7 +11,6 @@ ARI-51
 """
 
 import gzip
-import logging
 import re
 from datetime import datetime, timedelta
 from typing import Any
@@ -20,8 +19,9 @@ from core.exceptions import LogStoreUnavailableError, VaultSecretNotFoundError
 from core.interfaces.log_store import LogStoreInterface
 from core.interfaces.vault import VaultInterface
 from core.models import ConfidenceBand, LogLine, LogQueryResult, PlatformTag
+from core.observability import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 _LEVEL_PRIORITY = {"ERROR": 0, "FATAL": 0, "WARN": 1, "WARNING": 1, "INFO": 2, "DEBUG": 3}
 

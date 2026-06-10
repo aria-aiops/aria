@@ -10,14 +10,14 @@ error_class='unknown', LOW confidence, no evidence.
 """
 
 import json
-import logging
 from typing import Any
 
 from core.exceptions import ClassificationError
 from core.interfaces.llm_client import LLMClientInterface
 from core.models import ClassificationResult, ConfidenceBand, LogRequest, PipelineState
+from core.observability import EVENT_CLASSIFICATION_COMPLETED, get_logger, log_agent_lifecycle
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 _VALID_ERROR_CLASSES = frozenset(
     {"oom", "cpu", "disk", "network", "auth", "db_lock", "pipeline", "unknown"}
@@ -67,6 +67,7 @@ class ClassifierAgent:
         """
         self._llm = llm_client
 
+    @log_agent_lifecycle("agent3")
     def run(self, state: PipelineState) -> PipelineState:
         """Classify the incident in the current pipeline state.
 
@@ -102,6 +103,7 @@ class ClassifierAgent:
                 recommended_actions=[],
             )
             state.pending_log_request = None
+            self._emit_classification(state.classification)
             return state
 
         logger.info("classifier: running for %s", state.incident_number)
@@ -137,9 +139,23 @@ class ClassifierAgent:
             state.pending_log_request = log_request
             return state
 
+        # log_request is None here, so _parse_response guarantees a classification.
+        assert classification is not None
         state.classification = classification
         state.pending_log_request = None
+        self._emit_classification(classification)
         return state
+
+    @staticmethod
+    def _emit_classification(clf: ClassificationResult) -> None:
+        """Emit the canonical classification_completed event — the key learning signal."""
+        logger.info(
+            EVENT_CLASSIFICATION_COMPLETED,
+            error_class=clf.error_class,
+            confidence=clf.confidence,
+            confidence_band=clf.confidence_band,
+            evidence_count=len(clf.supporting_evidence),
+        )
 
     def _build_messages(self, state: PipelineState) -> list[dict[str, str]]:
         """Build the LLM user message from pipeline state.

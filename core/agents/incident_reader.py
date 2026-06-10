@@ -20,7 +20,6 @@ The M2 LLM extraction (_enrich) is preserved as the fallback for path 3.
 
 import dataclasses
 import json
-import logging
 import re
 from typing import Any
 
@@ -29,8 +28,9 @@ from core.interfaces.connector import ConnectorInterface
 from core.interfaces.knowledge_base import KnowledgeBaseInterface
 from core.interfaces.llm_client import LLMClientInterface
 from core.models import AffectedResource, CIClass, IncidentMetadata, PipelineState, PlatformTag
+from core.observability import EVENT_CI_RESOLVED, get_logger, log_agent_lifecycle
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # CI name / description keywords → PlatformTag (evaluated in order, first match wins)
 _PLATFORM_HINTS: list[tuple[list[str], "PlatformTag"]] = [
@@ -113,6 +113,7 @@ class IncidentReaderAgent:
         self._cmdb = cmdb_resolver
         self._kb = knowledge_base
 
+    @log_agent_lifecycle("agent1")
     def run(self, state: PipelineState) -> PipelineState:
         """Fetch and resolve the incident. Returns an updated PipelineState."""
         try:
@@ -133,22 +134,29 @@ class IncidentReaderAgent:
     # ── Three-path CI resolution (ARI-46) ───────────────────────────────────
 
     def _resolve(self, metadata: IncidentMetadata) -> IncidentMetadata:
-        """Route to the correct resolution path based on CI class."""
+        """Route to the correct resolution path based on CI class, then emit ci_resolved."""
         affected_ci = metadata.affected_ci
 
         if not affected_ci:
-            return self._path_unknown(metadata)
+            resolved, path = self._path_unknown(metadata), 3
+        else:
+            ci_class = self._cmdb.get_ci_class(affected_ci) if self._cmdb else CIClass.UNKNOWN
+            if ci_class in (CIClass.SERVICE, CIClass.NODE):
+                resolved, path = self._path_node_service(metadata, ci_class), 1
+            elif ci_class == CIClass.CLUSTER:
+                resolved, path = self._path_cluster(metadata), 2
+            else:
+                # UNKNOWN class with a CI present — try LLM enrichment
+                resolved, path = self._path_unknown(metadata), 3
 
-        ci_class = self._cmdb.get_ci_class(affected_ci) if self._cmdb else CIClass.UNKNOWN
-
-        if ci_class in (CIClass.SERVICE, CIClass.NODE):
-            return self._path_node_service(metadata, ci_class)
-
-        if ci_class == CIClass.CLUSTER:
-            return self._path_cluster(metadata)
-
-        # UNKNOWN class with a CI present — try LLM enrichment
-        return self._path_unknown(metadata)
+        ci_count = len(resolved.affected_resources) or (1 if resolved.affected_ci else 0)
+        logger.info(
+            EVENT_CI_RESOLVED,
+            resolution_path=path,
+            platform_tag=resolved.platform_tag,
+            ci_count=ci_count,
+        )
+        return resolved
 
     def _path_node_service(self, metadata: IncidentMetadata, ci_class: CIClass) -> IncidentMetadata:
         """Path 1: CI is a specific node or service.

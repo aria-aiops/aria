@@ -7,14 +7,17 @@ Swagger UI available at: http://localhost:8000/docs
 ReDoc available at:       http://localhost:8000/redoc
 """
 
-import logging
-
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from api.routers import agent1, agent2, agent3, agent4, health, pipeline
+from core.logging_config import configure_logging
+from core.observability import get_logger
 
-logger = logging.getLogger(__name__)
+# Configure structured logging once, at import time, before anything logs.
+configure_logging()
+
+logger = get_logger(__name__)
 
 app = FastAPI(
     title="ARIA Agent API",

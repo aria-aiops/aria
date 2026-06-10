@@ -35,6 +35,10 @@ conf.yaml
 # Generated test data (output of scripts/create_dod_test_data.py)
 data/dod_incident_mapping.json
 
+# Runtime logs (ARIA_LOG_DIR — structured logging output, P1.5 S1)
+logs/
+logs_verify/
+
 # pytest
 .pytest_cache/
 .coverage
