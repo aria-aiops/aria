@@ -11,7 +11,6 @@ Required env vars:
     SNOW_ASSIGNMENT_GROUP  Assignment group name to filter incidents (e.g. "Data Platform OPS")
 """
 
-import logging
 import os
 from datetime import datetime
 from typing import Any
@@ -23,8 +22,9 @@ import core.config as cfg
 from core.exceptions import ConnectorAuthError, ConnectorUnavailableError, IncidentNotFoundError
 from core.interfaces.connector import ConnectorInterface
 from core.models import IncidentMetadata, Priority
+from core.observability import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 _SNOW_FIELDS = ",".join(
     [

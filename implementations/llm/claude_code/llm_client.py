@@ -11,9 +11,13 @@ print mode. temperature=0 determinism is approximated by the model's default.
 import re
 import shutil
 import subprocess
+import time
 
 from core.exceptions import LLMAuthError, LLMResponseError, LLMUnavailableError
 from core.interfaces.llm_client import LLMClientInterface
+from core.observability import EVENT_LLM_CALL_COMPLETED, get_logger
+
+logger = get_logger(__name__)
 
 
 class ClaudeCodeLLMClient(LLMClientInterface):
@@ -91,6 +95,7 @@ class ClaudeCodeLLMClient(LLMClientInterface):
         if system:
             cmd.extend(["--system-prompt", system])
 
+        start = time.monotonic()
         try:
             result = subprocess.run(
                 cmd,
@@ -103,6 +108,16 @@ class ClaudeCodeLLMClient(LLMClientInterface):
             raise LLMUnavailableError("claude CLI timed out after 120s") from exc
         except FileNotFoundError as exc:
             raise LLMUnavailableError("claude CLI not found") from exc
+
+        # The CLI does not expose token usage in print mode — emit the event for
+        # trace/latency parity with the API client; token counts stay null.
+        logger.info(
+            EVENT_LLM_CALL_COMPLETED,
+            model=self._model,
+            tokens_in=None,
+            tokens_out=None,
+            duration_ms=int((time.monotonic() - start) * 1000),
+        )
 
         if result.returncode != 0:
             stderr = result.stderr.strip()

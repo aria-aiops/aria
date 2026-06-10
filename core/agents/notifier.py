@@ -8,13 +8,12 @@ meaningful to report). In all other cases a partial notification is sent so
 on-call engineers are always informed even if Agent 3 did not run.
 """
 
-import logging
-
 from core.interfaces.communicator import CommunicatorInterface
 from core.interfaces.llm_client import LLMClientInterface
 from core.models import NotificationPayload, PipelineState
+from core.observability import EVENT_NOTIFICATION_SENT, get_logger, log_agent_lifecycle
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class NotifierAgent:
@@ -36,6 +35,7 @@ class NotifierAgent:
         self._comm = communicator
         self._llm = llm_client  # unused in Phase 1; wired for Phase 2 response interpretation
 
+    @log_agent_lifecycle("agent4")
     def run(self, state: PipelineState) -> PipelineState:
         """Send a notification for the current pipeline state.
 
@@ -60,6 +60,11 @@ class NotifierAgent:
         try:
             self._comm.send(payload)
             state.notification_sent = True
+            logger.info(
+                EVENT_NOTIFICATION_SENT,
+                channel=type(self._comm).__name__,
+                is_partial=payload.is_partial,
+            )
         except Exception as exc:
             logger.warning("Agent 4 notification failed: %s", exc)
             state.error = f"Agent 4 notification failed: {exc}"

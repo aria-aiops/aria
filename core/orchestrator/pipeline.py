@@ -13,13 +13,25 @@ Graph shape:
                               agent4 → END
 """
 
-import logging
+from dataclasses import asdict
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
-from core.models import PipelineState
+from core.logging_config import configure_logging
+from core.models import PipelineState, RunStatus
+from core.observability import (
+    EVENT_PIPELINE_COMPLETED,
+    EVENT_PIPELINE_STARTED,
+    EVENT_REACT_LOOP_ITERATION,
+    EVENT_ROUTING_DECISION,
+    bind_run_context,
+    build_run_record,
+    clear_run_context,
+    get_logger,
+)
 
 if TYPE_CHECKING:
     from core.agents.classifier import ClassifierAgent
@@ -27,7 +39,7 @@ if TYPE_CHECKING:
     from core.agents.log_extractor import LogExtractorAgent
     from core.agents.notifier import NotifierAgent
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 _MAX_LOOP_ITERATIONS = 5
 
@@ -72,7 +84,6 @@ class ARIAPipeline:
 
     def _agent1_node(self, state: PipelineState) -> dict:
         """LangGraph node wrapper for Agent 1. Returns only the fields it writes."""
-        logger.info("pipeline: running agent1 for %s", state.incident_number)
         result = self._agent1.run(state)
         return {
             "incident_metadata": result.incident_metadata,
@@ -81,11 +92,6 @@ class ARIAPipeline:
 
     def _agent2_node(self, state: PipelineState) -> dict:
         """LangGraph node wrapper for Agent 2. Increments loop_iterations and clears pending_log_request."""
-        logger.info(
-            "pipeline: running agent2 (iteration %d) for %s",
-            state.loop_iterations + 1,
-            state.incident_number,
-        )
         result = self._agent2.run(state)
         return {
             "log_result": result.log_result,
@@ -98,7 +104,6 @@ class ARIAPipeline:
 
     def _agent3_node(self, state: PipelineState) -> dict:
         """LangGraph node wrapper for Agent 3. Returns classification and any pending log request."""
-        logger.info("pipeline: running agent3 for %s", state.incident_number)
         result = self._agent3.run(state)
         return {
             "classification": result.classification,
@@ -107,7 +112,6 @@ class ARIAPipeline:
 
     def _agent4_node(self, state: PipelineState) -> dict:
         """LangGraph node wrapper for Agent 4. Returns notification_sent and any delivery error."""
-        logger.info("pipeline: running agent4 for %s", state.incident_number)
         result = self._agent4.run(state)
         return {
             "notification_sent": result.notification_sent,
@@ -121,13 +125,25 @@ class ARIAPipeline:
     @staticmethod
     def _route_after_agent1(state: PipelineState) -> str:
         """Skip straight to agent4 (partial notification) on agent1 failure."""
-        return "agent4" if state.error else "agent2"
+        target = "agent4" if state.error else "agent2"
+        reason = "agent1_error" if state.error else "ok"
+        logger.info(EVENT_ROUTING_DECISION, from_agent="agent1", to_agent=target, reason=reason)
+        return target
 
     @staticmethod
     def _route_after_agent3(state: PipelineState) -> str:
         """Loop back to agent2 if agent3 needs more evidence, else proceed."""
         if state.pending_log_request and state.loop_iterations < _MAX_LOOP_ITERATIONS:
+            logger.info(
+                EVENT_REACT_LOOP_ITERATION,
+                iteration=state.loop_iterations,
+                reason=state.pending_log_request.request,
+            )
+            logger.info(
+                EVENT_ROUTING_DECISION, from_agent="agent3", to_agent="agent2", reason="need_logs"
+            )
             return "agent2"
+        logger.info(EVENT_ROUTING_DECISION, from_agent="agent3", to_agent="agent4", reason="done")
         return "agent4"
 
     # ------------------------------------------------------------------
@@ -177,15 +193,46 @@ class ARIAPipeline:
         Always returns a PipelineState. On failure, error is set and
         notification_sent reflects whether agent4 managed to notify.
         Never raises.
+
+        Observability: binds a run-scoped logging context (run_id + incident_number
+        carried on every downstream event), emits pipeline_started / pipeline_completed,
+        and assembles a RunRecord from the run accumulator + final state.
         """
+        configure_logging()  # idempotent — ensures sinks exist for tool-mode/direct calls
+
         initial = PipelineState(incident_number=incident_number)
+        accumulator = bind_run_context(initial.run_id, incident_number)
+        start_time = datetime.now(timezone.utc)
+        logger.info(EVENT_PIPELINE_STARTED, start_time=start_time)
+
         try:
             raw = self._graph.invoke(initial)
-            return PipelineState(**raw)
+            final = PipelineState(**raw)
+            end_time = datetime.now(timezone.utc)
+
+            record = build_run_record(final, accumulator, start_time, end_time)
+            # run_id + incident_number are already ambient on every event; drop the
+            # duplicates and emit the remaining RunRecord fields flat for easy querying.
+            payload = asdict(record)
+            payload.pop("run_id", None)
+            payload.pop("incident_number", None)
+            logger.info(EVENT_PIPELINE_COMPLETED, **payload)
+            return final
         except Exception as exc:
-            logger.exception("pipeline: unhandled exception for %s", incident_number)
+            logger.exception(
+                EVENT_PIPELINE_COMPLETED,
+                status=RunStatus.FAILED.value,
+                error=f"pipeline crash: {exc}",
+                per_agent_durations=dict(accumulator.per_agent_durations),
+                total_tokens_in=accumulator.total_tokens_in,
+                total_tokens_out=accumulator.total_tokens_out,
+                react_loop_iterations=initial.loop_iterations,
+            )
             return PipelineState(
                 incident_number=incident_number,
+                run_id=initial.run_id,
                 error=f"pipeline crash: {exc}",
                 notification_sent=False,
             )
+        finally:
+            clear_run_context()

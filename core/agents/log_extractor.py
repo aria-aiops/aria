@@ -26,7 +26,6 @@ ARI-13, ARI-14, ARI-74, ARI-75
 """
 
 import json
-import logging
 from datetime import datetime, timedelta
 
 from core.interfaces.knowledge_base import KnowledgeBaseInterface
@@ -43,8 +42,9 @@ from core.models import (
     PipelineState,
     PlatformTag,
 )
+from core.observability import EVENT_LOG_QUERY_COMPLETED, get_logger, log_agent_lifecycle
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 _DEFAULT_WINDOW = 30
 _EXTENDED_WINDOW = 60
@@ -86,6 +86,7 @@ class LogExtractorAgent:
         self._llm = llm_client
         self._cluster_hosts: dict[str, str] = cluster_hosts or {}
 
+    @log_agent_lifecycle("agent2")
     def run(self, state: PipelineState) -> PipelineState:
         """Run log extraction for the incident in the current pipeline state.
 
@@ -145,6 +146,7 @@ class LogExtractorAgent:
             except Exception as exc:
                 logger.error("Agent 2 unexpected error for %s: %s", state.incident_number, exc)
                 state.error = str(exc)
+            self._emit_query_completed(state, plan, meta)
             return state
 
         # Multiple resources — query each, merge results
@@ -154,8 +156,33 @@ class LogExtractorAgent:
             except Exception as exc:
                 logger.error("Agent 2 unexpected error for %s: %s", state.incident_number, exc)
                 state.error = str(exc)
+            self._emit_query_completed(state, plan, meta)
 
         return state
+
+    def _emit_query_completed(
+        self,
+        state: PipelineState,
+        plan: LogQueryPlan | None,
+        meta: IncidentMetadata,
+    ) -> None:
+        """Emit the canonical log_query_completed event from the final log_result."""
+        result = state.log_result
+        if result is None:
+            return
+        connector = (
+            plan.connector_name
+            if plan is not None
+            else (meta.platform_tag.value if meta.platform_tag else "unknown")
+        )
+        window = plan.time_window_minutes if plan is not None else _DEFAULT_WINDOW
+        logger.info(
+            EVENT_LOG_QUERY_COMPLETED,
+            connector=connector,
+            lines_returned=len(result.log_lines),
+            total_scanned=result.total_scanned,
+            window_minutes=window,
+        )
 
     # ── Internal ─────────────────────────────────────────────────────────────
 
@@ -394,6 +421,7 @@ class LogExtractorAgent:
         existing = state.log_result
         if existing is None:
             state.log_result = new_result
+            self._emit_query_completed(state, None, meta)
             return state
 
         combined_lines = sorted(
@@ -414,6 +442,7 @@ class LogExtractorAgent:
             total_scanned=combined_scanned,
             confidence=confidence,
         )
+        self._emit_query_completed(state, None, meta)
         return state
 
     def _query(

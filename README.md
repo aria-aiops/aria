@@ -277,6 +277,43 @@ See [documentation/aria_apis.md](documentation/aria_apis.md) for the full API sp
 
 ---
 
+## Logging & observability
+
+ARIA emits one **canonical structured event stream** (via [structlog](https://www.structlog.org)), rendered two ways from a single pass:
+
+- **stdout** — human-readable coloured output for ops by default; set `ARIA_LOG_FORMAT=json` to emit JSON on stdout instead (for containers that scrape stdout).
+- **rolling file** — *always* JSON, daily rotation with 30-day retention, at `${ARIA_LOG_DIR}/aria.log`. This is the machine feed: it is the substrate the Phase 1.5 S2 monitoring sprint queries, and the long-term corpus ARIA learns from.
+
+Every event carries ambient context bound once at pipeline entry — `run_id`, `incident_number`, `schema_version`, `service` — so a whole run is reconstructable with `grep run_id=<uuid> aria.log`. Third-party logs (paramiko, anthropic, langgraph, uvicorn) flow through the same sinks with the same structure.
+
+**Configuration (env vars):**
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `ARIA_LOG_DIR` | `logs` | Directory for the rolling `aria.log` file |
+| `ARIA_LOG_FORMAT` | *(console)* | `json` forces JSON on stdout; otherwise pretty console |
+| `ARIA_LOG_LEVEL` | `INFO` | Root log level |
+| `ARIA_LOG_PII` | *(redact)* | `allow` disables incident free-text redaction (debug only) |
+
+**Canonical event vocabulary** (the frozen contract — `core/observability.py`):
+
+| Event | Emitted by | Key fields |
+|---|---|---|
+| `pipeline_started` / `pipeline_completed` | Orchestrator | `start_time` / full `RunRecord` (status, per-agent durations, token totals, confidence, error class) |
+| `agent_started` / `agent_completed` / `agent_failed` | Lifecycle decorator | `agent_name`, `duration_ms`, `error_class` |
+| `ci_resolved` | Agent 1 | `resolution_path`, `platform_tag`, `ci_count` |
+| `log_query_completed` | Agent 2 | `connector`, `lines_returned`, `total_scanned`, `window_minutes` |
+| `classification_completed` | Agent 3 | `error_class`, `confidence`, `confidence_band`, `evidence_count` |
+| `react_loop_iteration` / `routing_decision` | Orchestrator | `iteration` / `from_agent`, `to_agent`, `reason` |
+| `llm_call_completed` | LLM clients | `model`, `tokens_in`, `tokens_out`, `duration_ms` |
+| `notification_sent` | Agent 4 | `channel`, `is_partial` |
+
+Each run is summarised into a `RunRecord` (`core/models.py`) at completion — the same model the S2 monitoring store persists, so logging and monitoring share one contract with no duplicate instrumentation.
+
+**PII safety**: incident free-text fields (`description`, `long_description`, `raw_record`, `caller`) are redacted to `[REDACTED:<len>]` before any sink, keeping both the log file and the learning corpus clean.
+
+---
+
 ## Plugin architecture
 
 **Core principle**: ARIA's core engine is pure Python with ZERO cloud dependencies. All infrastructure concerns (connectors, queues, state stores) are abstracted behind Python ABCs (Abstract Base Classes).
@@ -493,8 +530,8 @@ Phase 1 is complete when all of the following pass on 10 consecutive test incide
 | Phase 1 | M6: Orchestration + full pipeline | ✅ Done |
 | Phase 1 | S8: ReAct loop trigger — cross-service log requests | ✅ Done |
 | Phase 1 | M7: Acceptance criteria validated on local environment | ✅ Done |
-| **Phase 1.5** | **S1: Structured logging — structlog, `run_id`, lifecycle events** | 🔜 Next |
-| Phase 1.5 | S2: Monitoring foundation — run store, REST API, Alpine.js dashboard, mode scaffold | 🔜 Planned |
+| Phase 1.5 | S1: Structured logging — structlog, `run_id`, lifecycle events, RunRecord | ✅ Done |
+| **Phase 1.5** | **S2: Monitoring foundation — run store, REST API, Alpine.js dashboard, mode scaffold** | 🔜 Next |
 | Phase 1.5 | S3: Docker + `ARIA_CONFIG_PATH` + `VertexAILLMClient` + LLM provider DI | 🔜 Planned |
 | Phase 1.5 | S4: Testing infrastructure — UC1/UC2/UC3 cluster wiring, KB runbooks, CMDB validation | 🔜 Planned |
 | Phase 1.5 | S5: Round 2 acceptance testing — 30 incidents on UC1 + UC2 real infrastructure | 🔜 Planned |
