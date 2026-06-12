@@ -212,13 +212,15 @@ class NotificationPayload:
 
 
 class RunStatus(str, Enum):
-    """Terminal outcome of a pipeline run, recorded in the RunRecord.
+    """Outcome of a pipeline run, recorded in the RunRecord.
 
+    RUNNING — run is in flight; only ever seen in the live RunStateStore (P1.5 S2).
     SUCCESS — full pipeline completed and a notification was sent.
     PARTIAL — an agent failed mid-pipeline but a partial notification still went out.
     FAILED  — the run could not notify at all.
     """
 
+    RUNNING = "running"
     SUCCESS = "success"
     PARTIAL = "partial"
     FAILED = "failed"
@@ -240,16 +242,62 @@ class RunRecord:
     run_id: str
     incident_number: str
     start_time: datetime
-    end_time: datetime
+    end_time: datetime | None  # None while the run is still in flight (live state)
     status: RunStatus
     current_agent: str | None
     per_agent_durations: dict[str, int]
     total_tokens_in: int
     total_tokens_out: int
     confidence: float | None
+    confidence_band: Optional["ConfidenceBand"]
     error_class: str | None
     react_loop_iterations: int
     outcome: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialise to a plain dict: datetimes → ISO strings, enums → values.
+
+        Single serialisation path shared by the SQLite store and the JSON API,
+        so the persisted record and the API response never diverge.
+        """
+        return {
+            "run_id": self.run_id,
+            "incident_number": self.incident_number,
+            "start_time": self.start_time.isoformat(),
+            "end_time": self.end_time.isoformat() if self.end_time else None,
+            "status": self.status.value,
+            "current_agent": self.current_agent,
+            "per_agent_durations": dict(self.per_agent_durations),
+            "total_tokens_in": self.total_tokens_in,
+            "total_tokens_out": self.total_tokens_out,
+            "confidence": self.confidence,
+            "confidence_band": self.confidence_band.value if self.confidence_band else None,
+            "error_class": self.error_class,
+            "react_loop_iterations": self.react_loop_iterations,
+            "outcome": self.outcome,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "RunRecord":
+        """Rebuild a RunRecord from a to_dict() payload (inverse round-trip)."""
+        band = data.get("confidence_band")
+        end_time = data.get("end_time")
+        return cls(
+            run_id=data["run_id"],
+            incident_number=data["incident_number"],
+            start_time=datetime.fromisoformat(data["start_time"]),
+            end_time=datetime.fromisoformat(end_time) if end_time else None,
+            status=RunStatus(data["status"]),
+            current_agent=data.get("current_agent"),
+            per_agent_durations=dict(data.get("per_agent_durations") or {}),
+            total_tokens_in=data["total_tokens_in"],
+            total_tokens_out=data["total_tokens_out"],
+            confidence=data.get("confidence"),
+            confidence_band=ConfidenceBand(band) if band else None,
+            error_class=data.get("error_class"),
+            react_loop_iterations=data["react_loop_iterations"],
+            outcome=data.get("outcome"),
+        )
 
 
 @dataclass

@@ -272,6 +272,9 @@ All responses are JSON. All errors use the same envelope — no HTML error pages
 | Agent 3 — Classifier | `POST /api/v1/agent3/run` | ✅ Implemented |
 | Agent 4 — Notifier | `POST /api/v1/agent4/run` | ✅ Implemented |
 | Agent 0 — Pipeline (full run) | `POST /api/v1/pipeline/run` | ✅ Implemented |
+| Monitoring — run history | `GET /api/v1/runs` | ✅ Implemented |
+| Monitoring — run detail | `GET /api/v1/runs/{run_id}` | ✅ Implemented |
+| Monitoring — live status | `GET /api/v1/runs/{run_id}/status` | ✅ Implemented |
 
 See [documentation/aria_apis.md](documentation/aria_apis.md) for the full API specification including request/response schemas, error codes, and API mode configuration.
 
@@ -311,6 +314,44 @@ Every event carries ambient context bound once at pipeline entry — `run_id`, `
 Each run is summarised into a `RunRecord` (`core/models.py`) at completion — the same model the S2 monitoring store persists, so logging and monitoring share one contract with no duplicate instrumentation.
 
 **PII safety**: incident free-text fields (`description`, `long_description`, `raw_record`, `caller`) are redacted to `[REDACTED:<len>]` before any sink, keeping both the log file and the learning corpus clean.
+
+---
+
+## Monitoring (P1.5 S2)
+
+Every pipeline run is persisted and queryable. The orchestrator tracks live state while a run executes and writes exactly one after-action `RunRecord` on every outcome — success, partial, or failure.
+
+**Two stores, both behind interfaces** (the Phase 2 Redis swap touches no orchestrator or API code):
+
+| Store | Interface | Phase 1.5 implementation | Holds |
+|---|---|---|---|
+| Live run state | `RunStateStoreInterface` | In-memory dict | `current_agent`, elapsed time — exists only while a run is in flight |
+| Run history | `RunStoreInterface` | SQLite (`data/runs.db`) | One `RunRecord` per completed run — durations, token totals, confidence, error class |
+
+**Monitoring endpoints:**
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /api/v1/runs` | Paginated run history. Filters: `from`, `to`, `status`, `error_class`; returns `{ runs, total }` |
+| `GET /api/v1/runs/{run_id}` | Full run detail — per-agent durations, token counts, ReAct iterations |
+| `GET /api/v1/runs/{run_id}/status` | Lightweight live poll: `current_agent`, `elapsed_ms`, `status`. 404 once the run completes — the stop-polling signal |
+
+**Operating mode scaffold** (`ARIA_OPERATING_MODE` or `runtime.operating_mode` in conf.yaml):
+
+| Mode | Status |
+|---|---|
+| `inform` (default) | ✅ Implemented — notify-only, no write-back |
+| `hitm` | 🔒 Raises `NotImplementedError` until Phase 2 (human approval gate) |
+| `autonomous` | 🔒 Raises `NotImplementedError` until Phase 3 |
+
+The explicit raise is a guardrail: a misconfigured deployment fails loudly at the first run instead of silently behaving like `inform`.
+
+**Configuration (env vars):**
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `ARIA_RUN_DB_PATH` | `data/runs.db` | SQLite file for run history |
+| `ARIA_OPERATING_MODE` | `inform` | Pipeline operating mode (see above) |
 
 ---
 

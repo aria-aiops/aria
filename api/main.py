@@ -10,7 +10,7 @@ ReDoc available at:       http://localhost:8000/redoc
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from api.routers import agent1, agent2, agent3, agent4, health, pipeline
+from api.routers import agent1, agent2, agent3, agent4, health, monitoring, pipeline
 from core.logging_config import configure_logging
 from core.observability import get_logger
 
@@ -39,6 +39,7 @@ app.include_router(agent2.router, prefix="/api/v1")
 app.include_router(agent3.router, prefix="/api/v1")
 app.include_router(agent4.router, prefix="/api/v1")
 app.include_router(pipeline.router, prefix="/api/v1")
+app.include_router(monitoring.router, prefix="/api/v1")
 
 # ── Global error handler — always return JSON, never HTML ──────────────────────
 

@@ -15,18 +15,42 @@ from core.agents.classifier import ClassifierAgent
 from core.agents.incident_reader import IncidentReaderAgent
 from core.agents.log_extractor import LogExtractorAgent
 from core.agents.notifier import NotifierAgent
+from core.interfaces.run_state_store import RunStateStoreInterface
+from core.interfaces.run_store import RunStoreInterface
 from core.models import PlatformTag
 from core.orchestrator.pipeline import ARIAPipeline
 from implementations.clusters.cloud.gcp.log_connector import GCPLogConnector
 from implementations.clusters.onprem.log_connector import SSHLogConnector
 from implementations.itsm.servicenow.connector import ServiceNowConnector
 from implementations.llm.claude_code.llm_client import ClaudeCodeLLMClient as LLMClient
+from implementations.storage.memory_run_state_store import InMemoryRunStateStore
+from implementations.storage.sqlite_run_store import SQLiteRunStore
 from implementations.vault.envvar import EnvVarVault
 
 
 def _resolve_model(agent_num: str) -> str | None:
     """Thin wrapper around cfg.resolve_model for use inside this module."""
     return cfg.resolve_model(agent_num)
+
+
+@lru_cache(maxsize=1)
+def get_run_store() -> RunStoreInterface:
+    """Build and cache the after-action run history store (P1.5 S2).
+
+    One instance per process — shared between the pipeline (writes on
+    completion) and the monitoring router (reads).
+    """
+    return SQLiteRunStore(db_path=cfg.run_db_path())
+
+
+@lru_cache(maxsize=1)
+def get_run_state_store() -> RunStateStoreInterface:
+    """Build and cache the live run state store (P1.5 S2).
+
+    In-memory: the pipeline and the /status endpoint must share this exact
+    instance, which the lru_cache guarantees within one API process.
+    """
+    return InMemoryRunStateStore()
 
 
 @lru_cache(maxsize=1)
@@ -142,7 +166,16 @@ def get_pipeline() -> "ARIAPipeline":
         agent3 = ClassifierAgent(llm_client=LLMClient(model=model3) if model3 else None)
         agent4 = get_agent4()
 
-    return ARIAPipeline(agent1, agent2, agent3, agent4)
+    # Monitoring stores (P1.5 S2): the API pipeline always records run history
+    # and live status. Direct/tool-mode constructions omit them (no-op).
+    return ARIAPipeline(
+        agent1,
+        agent2,
+        agent3,
+        agent4,
+        run_store=get_run_store(),
+        run_state_store=get_run_state_store(),
+    )
 
 
 @lru_cache(maxsize=1)
