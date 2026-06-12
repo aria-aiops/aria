@@ -305,3 +305,57 @@ class HealthResponse(BaseModel):
     status: str
     version: str
     agents: dict[str, str]
+
+
+# ── Monitoring (P1.5 S2) ───────────────────────────────────────────────────────
+
+
+class RunSummary(BaseModel):
+    """One row of the run list — the fields the dashboard table displays.
+
+    Mirrors RunRecord.to_dict() for the list-view subset; duration_ms is
+    derived (end_time - start_time) so clients never compute it themselves.
+    """
+
+    run_id: str
+    incident_number: str
+    status: str  # "running" | "success" | "partial" | "failed"
+    error_class: str | None
+    confidence: float | None
+    confidence_band: str | None  # "high" | "medium" | "low"
+    duration_ms: int | None  # None while the run is still in flight
+    start_time: datetime
+
+
+class RunListResponse(BaseModel):
+    """Response body for GET /runs — one page of run history plus total count."""
+
+    runs: list[RunSummary]
+    total: int  # total matching records across all pages (drives pagination UI)
+
+
+class RunDetailResponse(BaseModel):
+    """Response body for GET /runs/{run_id} — the full RunRecord."""
+
+    run_id: str
+    incident_number: str
+    start_time: datetime
+    end_time: datetime | None
+    status: str
+    current_agent: str | None
+    per_agent_durations: dict[str, int]
+    total_tokens_in: int
+    total_tokens_out: int
+    confidence: float | None
+    confidence_band: str | None
+    error_class: str | None
+    react_loop_iterations: int
+    outcome: str | None
+
+
+class RunStatusResponse(BaseModel):
+    """Response body for GET /runs/{run_id}/status — lightweight 1s-poll payload."""
+
+    current_agent: str | None
+    elapsed_ms: int
+    status: str

@@ -359,7 +359,7 @@ Formats and sends findings to Slack / MS Teams.
 
 ## Pipeline
 
-> **Status**: 🔜 M6 (ARI-65)
+> **Status**: ✅ Implemented (M6)
 
 Runs all four agents in sequence and returns the complete pipeline state as JSON.
 
@@ -389,3 +389,105 @@ Runs all four agents in sequence and returns the complete pipeline state as JSON
   "error": null
 }
 ```
+
+---
+
+## Monitoring (P1.5 S2)
+
+Run history and live status for every pipeline run. The same endpoints feed the
+built-in dashboard (P1.5 S2) and any external ops tooling.
+
+### `GET /api/v1/runs`
+
+Paginated run history, newest first. All filtering is server-side.
+
+**Query parameters**
+
+| Param | Type | Default | Purpose |
+|---|---|---|---|
+| `from` | ISO 8601 datetime | — | Only runs with `start_time >=` |
+| `to` | ISO 8601 datetime | — | Only runs with `start_time <=` |
+| `status` | string | — | Exact match: `success` \| `partial` \| `failed` |
+| `error_class` | string | — | Exact match on classified error class |
+| `limit` | int (1–500) | 50 | Page size |
+| `offset` | int | 0 | Records to skip |
+
+**Response 200**
+```json
+{
+  "runs": [
+    {
+      "run_id": "9b1c6c2e-...",
+      "incident_number": "INC0010001",
+      "status": "success",
+      "error_class": "oom",
+      "confidence": 0.88,
+      "confidence_band": "high",
+      "duration_ms": 8432,
+      "start_time": "2026-06-12T09:14:02Z"
+    }
+  ],
+  "total": 1
+}
+```
+
+`total` counts all matching records across pages — use it to drive pagination.
+
+### `GET /api/v1/runs/{run_id}`
+
+Full after-action record for one run. **404** if the `run_id` is unknown.
+
+**Response 200**
+```json
+{
+  "run_id": "9b1c6c2e-...",
+  "incident_number": "INC0010001",
+  "start_time": "2026-06-12T09:14:02Z",
+  "end_time": "2026-06-12T09:14:10Z",
+  "status": "success",
+  "current_agent": null,
+  "per_agent_durations": { "agent1": 1200, "agent2": 3400, "agent3": 900, "agent4": 300 },
+  "total_tokens_in": 1500,
+  "total_tokens_out": 400,
+  "confidence": 0.88,
+  "confidence_band": "high",
+  "error_class": "oom",
+  "react_loop_iterations": 1,
+  "outcome": null
+}
+```
+
+`outcome` is always `null` in Phase 1 — it is populated by the Phase 2
+Approve/Reject gate.
+
+### `GET /api/v1/runs/{run_id}/status`
+
+Lightweight live polling for an in-flight run — designed for 1-second polling.
+Reads only the in-memory live state store.
+
+**Response 200** (run in flight)
+```json
+{
+  "current_agent": "agent2",
+  "elapsed_ms": 4210,
+  "status": "running"
+}
+```
+
+**Response 404** — the run is not in flight. Completed runs move to the run
+history store; a 404 here is the client's signal to stop polling and fetch
+`GET /api/v1/runs/{run_id}` instead.
+
+### Operating mode
+
+The pipeline checks `ARIA_OPERATING_MODE` (or `runtime.operating_mode` in
+`conf.yaml`) before every run:
+
+| Mode | Behaviour |
+|---|---|
+| `inform` (default) | Normal notify-only pipeline run |
+| `hitm` | `NotImplementedError` — ships in Phase 2 |
+| `autonomous` | `NotImplementedError` — ships in Phase 3 |
+
+When called through `POST /api/v1/pipeline/run`, an unimplemented mode surfaces
+as the standard JSON error envelope from the global exception handler.
