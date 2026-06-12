@@ -21,9 +21,14 @@ router = APIRouter(tags=["Dashboard"])
 
 _STATIC_DIR = Path(__file__).parent.parent / "static" / "dashboard"
 
-# Explicit allowlist — the dashboard is exactly these pages; anything else is a
-# 404 rather than a directory traversal surface.
-_PAGES = {"index.html", "run.html"}
+# Explicit allowlist mapping page name → server-defined path. The user-supplied
+# string is only ever a dict key, never part of a filesystem path — anything not
+# listed is a 404 and there is no directory-traversal surface (CodeQL
+# py/path-injection clean by construction).
+_PAGES = {
+    "index.html": _STATIC_DIR / "index.html",
+    "run.html": _STATIC_DIR / "run.html",
+}
 
 
 def _require_enabled() -> None:
@@ -43,6 +48,7 @@ def dashboard_root() -> RedirectResponse:
 def dashboard_page(page: str) -> FileResponse:
     """Serve one of the allowlisted static dashboard pages."""
     _require_enabled()
-    if page not in _PAGES:
+    path = _PAGES.get(page)
+    if path is None:
         raise HTTPException(status_code=404, detail=f"Unknown dashboard page: {page}")
-    return FileResponse(_STATIC_DIR / page, media_type="text/html")
+    return FileResponse(path, media_type="text/html")
