@@ -170,6 +170,15 @@ def operating_mode() -> str:
 # ── Monitoring (P1.5 S2) ──────────────────────────────────────────────────────
 
 
+def dashboard_enabled() -> bool:
+    """Return True when ARIA_DASHBOARD_ENABLED is 'true' or '1'.
+
+    Off by default so the REST API works standalone; the dashboard is an
+    optional, zero-build ops UI served by the same FastAPI process.
+    """
+    return os.environ.get("ARIA_DASHBOARD_ENABLED", "").lower() in ("true", "1")
+
+
 def run_db_path() -> str:
     """Return the SQLite file path for the run history store.
 
