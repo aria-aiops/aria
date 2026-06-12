@@ -150,6 +150,7 @@ def build_run_record(
         total_tokens_in=accumulator.total_tokens_in,
         total_tokens_out=accumulator.total_tokens_out,
         confidence=clf.confidence if clf else None,
+        confidence_band=clf.confidence_band if clf else None,
         error_class=clf.error_class if clf else None,
         react_loop_iterations=state.loop_iterations,
         outcome=None,  # populated by the Phase 2 Approve/Reject gate

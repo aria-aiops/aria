@@ -28,6 +28,15 @@ def _raw() -> dict:
         with path.open() as f:
             return yaml.safe_load(f) or {}
     except Exception:
+        # Never crash config loading — but a malformed conf.yaml silently
+        # falling back to env vars is a debugging trap, so say so (#87).
+        import logging
+
+        logging.getLogger(__name__).warning(
+            "conf.yaml exists but could not be parsed — falling back to "
+            "environment variables only",
+            exc_info=True,
+        )
         return {}
 
 
@@ -145,6 +154,29 @@ def dry_run() -> bool:
     can be exercised without real ServiceNow/Slack/SSH credentials.
     """
     return os.environ.get("ARIA_DRY_RUN", "").lower() in ("true", "1")
+
+
+def operating_mode() -> str:
+    """Return the pipeline operating mode: 'inform', 'hitm', or 'autonomous'.
+
+    Reads runtime.operating_mode from conf.yaml, falling back to the
+    ARIA_OPERATING_MODE env var. Defaults to 'inform' — the only mode
+    implemented in Phase 1.5. The orchestrator rejects the other two with
+    NotImplementedError until their phases land (P1.5 S2 scaffold, #47).
+    """
+    return _get(["runtime", "operating_mode"], "ARIA_OPERATING_MODE", "inform").lower()
+
+
+# ── Monitoring (P1.5 S2) ──────────────────────────────────────────────────────
+
+
+def run_db_path() -> str:
+    """Return the SQLite file path for the run history store.
+
+    Reads runs.db_path from conf.yaml / ARIA_RUN_DB_PATH env var.
+    Defaults to data/runs.db (project root, local dev).
+    """
+    return _get(["runs", "db_path"], "ARIA_RUN_DB_PATH", "data/runs.db")
 
 
 # ── GCP ───────────────────────────────────────────────────────────────────────

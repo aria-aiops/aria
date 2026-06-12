@@ -10,6 +10,14 @@
 # env var reads with conf.yaml reads) is a pre-S6 task.
 # ──────────────────────────────────────────────────────────────────────────────
 
+runtime:
+  operating_mode: inform    # inform | hitm | autonomous — only 'inform' is implemented
+                            # in Phase 1.5; the others raise NotImplementedError until
+                            # their phase ships (hitm: Phase 2, autonomous: Phase 3)
+
+runs:
+  db_path: data/runs.db     # SQLite file for run history (monitoring API + dashboard)
+
 servicenow:
   instance: <your-instance>.service-now.com   # e.g. dev12345.service-now.com
   user: <your-service-account>                # ServiceNow service account username

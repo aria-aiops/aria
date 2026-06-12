@@ -12,6 +12,20 @@ from implementations.itsm.servicenow.connector import ServiceNowConnector
 
 # ── Fixtures ─────────────────────────────────────────────────────────────────
 
+
+@pytest.fixture(autouse=True)
+def isolate_config(monkeypatch):
+    """Pin config reads to the patched environment, ignoring any local conf.yaml (#87).
+
+    cfg._get() prefers conf.yaml over env vars, so a developer's populated
+    conf.yaml leaked into these tests and made the missing-credential tests
+    pass or fail depending on the machine (CI has no conf.yaml). Forcing the
+    parsed YAML to {} makes every config read resolve from os.environ, which
+    patch.dict(clear=True) already controls deterministically.
+    """
+    monkeypatch.setattr("core.config._raw", lambda: {})
+
+
 SNOW_ENV = {
     "SNOW_INSTANCE": "dev.service-now.com",
     "SNOW_USER": "admin",
