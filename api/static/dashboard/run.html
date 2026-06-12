@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<!--
+  ARIA dashboard — run detail + live view (P1.5 S2, #49).
+  Reads run_id from the query string. Completed runs render a per-agent
+  accordion from GET /api/v1/runs/{run_id}. A run still in flight polls
+  GET /api/v1/runs/{run_id}/status every second and highlights the current
+  agent in the A1 → A2 → A3 → A4 step indicator; the 404 from /status is
+  the signal the run finished, at which point the final detail is fetched.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>ARIA — Run detail</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <style>
+    :root { --ok:#16a34a; --warn:#d97706; --bad:#dc2626; --live:#2563eb; }
+    body { font-family: system-ui, sans-serif; margin: 2rem auto; max-width: 860px; color:#111; }
+    a { color:#2563eb; text-decoration:none; font-size:.85rem; }
+    h1 { font-size: 1.3rem; }
+    .badge { display:inline-block; padding:.15rem .55rem; border-radius:999px; color:#fff; font-size:.75rem; font-weight:600; }
+    .badge.success { background:var(--ok); } .badge.partial { background:var(--warn); }
+    .badge.failed { background:var(--bad); } .badge.running { background:var(--live); }
+    .meta { display:flex; gap:1.5rem; flex-wrap:wrap; margin:.8rem 0; font-size:.88rem; color:#374151; }
+    .meta b { color:#111; }
+    /* pipeline step indicator */
+    .steps { display:flex; gap:.5rem; margin:1.2rem 0; }
+    .step { flex:1; text-align:center; padding:.6rem .3rem; border-radius:8px; background:#f3f4f6;
+            color:#6b7280; font-size:.85rem; border:2px solid transparent; }
+    .step.current { background:#dbeafe; color:#1d4ed8; border-color:#2563eb; font-weight:600; }
+    .step.done { background:#dcfce7; color:#166534; }
+    /* accordion */
+    details { border:1px solid #e5e7eb; border-radius:8px; margin:.5rem 0; padding:.6rem .9rem; }
+    summary { cursor:pointer; font-weight:600; font-size:.92rem; display:flex; justify-content:space-between; }
+    summary .dur { color:#6b7280; font-weight:normal; }
+    dl { display:grid; grid-template-columns: 11rem 1fr; gap:.3rem .8rem; font-size:.87rem; margin:.6rem 0 0; }
+    dt { color:#6b7280; } dd { margin:0; }
+    .error { color:var(--bad); }
+    .muted { color:#6b7280; }
+  </style>
+</head>
+<body x-data="runDetail()" x-init="init()">
+  <a href="/dashboard/index.html">← back to run list</a>
+  <h1>
+    Run <code x-text="runId"></code>
+    <span class="badge" :class="status" x-text="status"></span>
+  </h1>
+
+  <div class="meta" x-show="run">
+    <span>Incident <b x-text="run?.incident_number"></b></span>
+    <span>Started <b x-text="run ? new Date(run.start_time).toLocaleString() : ''"></b></span>
+    <span x-show="status === 'running'">Elapsed <b x-text="fmtMs(elapsedMs)"></b></span>
+    <span x-show="run?.end_time">Duration <b x-text="fmtMs(durationMs())"></b></span>
+    <span x-show="run?.confidence_band">Confidence <b x-text="`${run?.confidence_band} (${run?.confidence})`"></b></span>
+    <span x-show="run?.error_class">Error class <b class="error" x-text="run?.error_class"></b></span>
+  </div>
+
+  <!-- A1 → A2 → A3 → A4 pipeline step indicator (live view) -->
+  <div class="steps">
+    <template x-for="agent in agents" :key="agent">
+      <div class="step" :class="stepClass(agent)">
+        <span x-text="agentLabels[agent]"></span>
+      </div>
+    </template>
+  </div>
+
+  <!-- per-agent accordion (completed runs) -->
+  <template x-if="run && status !== 'running'">
+    <div>
+      <template x-for="agent in agents" :key="agent">
+        <details x-show="run.per_agent_durations[agent] !== undefined">
+          <summary>
+            <span x-text="agentLabels[agent]"></span>
+            <span class="dur" x-text="fmtMs(run.per_agent_durations[agent])"></span>
+          </summary>
+          <dl>
+            <dt>Duration</dt><dd x-text="fmtMs(run.per_agent_durations[agent])"></dd>
+            <!-- token totals are per-run (the accumulator sums across agents) -->
+            <dt>Tokens in / out (run)</dt><dd x-text="`${run.total_tokens_in} / ${run.total_tokens_out}`"></dd>
+            <template x-if="agent === 'agent2'">
+              <div style="display:contents">
+                <dt>ReAct iterations</dt><dd x-text="run.react_loop_iterations"></dd>
+              </div>
+            </template>
+            <template x-if="agent === 'agent3' && run.error_class">
+              <div style="display:contents">
+                <dt>Error class</dt><dd class="error" x-text="run.error_class"></dd>
+              </div>
+            </template>
+          </dl>
+        </details>
+      </template>
+      <p class="muted" x-show="Object.keys(run.per_agent_durations).length === 0">
+        No per-agent timings recorded (run crashed before any agent completed).
+      </p>
+    </div>
+  </template>
+
+  <p class="muted" x-show="notFound">Run not found.</p>
+
+  <script>
+    function runDetail() {
+      return {
+        runId: new URLSearchParams(window.location.search).get("run_id"),
+        run: null, status: "…", elapsedMs: 0, currentAgent: null,
+        notFound: false, poller: null,
+        agents: ["agent1", "agent2", "agent3", "agent4"],
+        agentLabels: {
+          agent1: "A1 · Incident Reader", agent2: "A2 · Log Extractor",
+          agent3: "A3 · Classifier", agent4: "A4 · Notifier",
+        },
+
+        async init() {
+          // Try live status first: 200 → in flight (start 1 s polling),
+          // 404 → completed (fetch the after-action detail).
+          const live = await fetch(`/api/v1/runs/${this.runId}/status`);
+          if (live.ok) {
+            this.applyLive(await live.json());
+            this.poller = setInterval(() => this.poll(), 1000);
+          } else {
+            await this.loadDetail();
+          }
+        },
+
+        async poll() {
+          const resp = await fetch(`/api/v1/runs/${this.runId}/status`);
+          if (resp.ok) {
+            this.applyLive(await resp.json());
+          } else {
+            // 404 = run finished → stop polling, render the final record
+            clearInterval(this.poller);
+            await this.loadDetail();
+          }
+        },
+
+        applyLive(body) {
+          this.status = body.status;
+          this.currentAgent = body.current_agent;
+          this.elapsedMs = body.elapsed_ms;
+          // minimal run stub so the meta row renders while in flight
+          this.run ??= { incident_number: "…", start_time: new Date().toISOString(),
+                         per_agent_durations: {}, total_tokens_in: 0, total_tokens_out: 0 };
+        },
+
+        async loadDetail() {
+          const resp = await fetch(`/api/v1/runs/${this.runId}`);
+          if (!resp.ok) { this.notFound = true; this.status = "unknown"; return; }
+          this.run = await resp.json();
+          this.status = this.run.status;
+          this.currentAgent = null;
+        },
+
+        stepClass(agent) {
+          if (this.status === "running") {
+            return agent === this.currentAgent ? "current" : "";
+          }
+          // completed: mark agents that actually ran
+          return this.run?.per_agent_durations?.[agent] !== undefined ? "done" : "";
+        },
+
+        durationMs() {
+          if (!this.run?.end_time) return null;
+          return new Date(this.run.end_time) - new Date(this.run.start_time);
+        },
+
+        fmtMs(ms) {
+          if (ms == null) return "—";
+          const s = Math.round(ms / 1000);
+          return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`;
+        },
+      };
+    }
+  </script>
+</body>
+</html>

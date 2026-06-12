@@ -346,12 +346,20 @@ Every pipeline run is persisted and queryable. The orchestrator tracks live stat
 
 The explicit raise is a guardrail: a misconfigured deployment fails loudly at the first run instead of silently behaving like `inform`.
 
+**Built-in dashboard** (`ARIA_DASHBOARD_ENABLED=true`):
+
+A zero-build ops UI — two static Alpine.js pages served by the same FastAPI process (no Node, no bundler, no separate deployment). Off by default; the REST API works identically without it.
+
+- **`/dashboard`** — run list: colour-coded status badges, incident number, error class, confidence band, duration, relative start time. Auto-refreshes every 30 s. Date-range / status / error-class filters are passed straight through to `GET /api/v1/runs` — all filtering is server-side.
+- **`/dashboard/run.html?run_id=…`** — per-agent accordion (durations, token totals, ReAct iterations, error class). For an in-flight run it polls `/status` every second and highlights the current agent in an A1 → A2 → A3 → A4 step indicator, switching to the final record when the run completes.
+
 **Configuration (env vars):**
 
 | Variable | Default | Purpose |
 |---|---|---|
 | `ARIA_RUN_DB_PATH` | `data/runs.db` | SQLite file for run history |
 | `ARIA_OPERATING_MODE` | `inform` | Pipeline operating mode (see above) |
+| `ARIA_DASHBOARD_ENABLED` | *(off)* | `true` serves the built-in dashboard at `/dashboard` |
 
 ---
 

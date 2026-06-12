@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<!--
+  ARIA dashboard — run list view (P1.5 S2, #48 + #49).
+  Static page, no build step: Alpine.js from CDN drives the table off
+  GET /api/v1/runs. Filters are passed through as query params — all
+  filtering is server-side. Auto-refreshes every 30 s.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>ARIA — Run history</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <style>
+    :root { --ok:#16a34a; --warn:#d97706; --bad:#dc2626; --live:#6b7280; }
+    body { font-family: system-ui, sans-serif; margin: 2rem auto; max-width: 1100px; color:#111; }
+    h1 { font-size: 1.4rem; } h1 small { color:#6b7280; font-weight: normal; }
+    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+    th, td { text-align: left; padding: .55rem .7rem; border-bottom: 1px solid #e5e7eb; font-size: .9rem; }
+    th { color:#6b7280; font-weight: 600; text-transform: uppercase; font-size: .72rem; letter-spacing: .04em; }
+    tr.row:hover { background:#f9fafb; cursor: pointer; }
+    .badge { display:inline-block; padding:.15rem .55rem; border-radius:999px; color:#fff; font-size:.75rem; font-weight:600; }
+    .badge.success { background:var(--ok); } .badge.partial { background:var(--warn); }
+    .badge.failed { background:var(--bad); } .badge.running { background:var(--live); }
+    .filters { display:flex; gap:.6rem; flex-wrap:wrap; align-items:end; margin-top:1rem; }
+    .filters label { display:flex; flex-direction:column; font-size:.72rem; color:#6b7280; gap:.2rem; }
+    .filters input, .filters select { padding:.35rem .5rem; border:1px solid #d1d5db; border-radius:6px; font-size:.85rem; }
+    .pager { display:flex; gap:.6rem; align-items:center; margin-top:1rem; font-size:.85rem; }
+    .pager button { padding:.3rem .8rem; border:1px solid #d1d5db; border-radius:6px; background:#fff; cursor:pointer; }
+    .pager button:disabled { opacity:.4; cursor:default; }
+    .muted { color:#6b7280; }
+  </style>
+</head>
+<body x-data="runList()" x-init="load(); setInterval(load, 30000)">
+  <h1>ARIA — Run history <small x-text="`(${total} runs)`"></small></h1>
+
+  <!-- History filters (#49) — every change re-queries the API, no page reload -->
+  <div class="filters">
+    <label>From
+      <input type="datetime-local" x-model="filters.from" @change="page=0; load()">
+    </label>
+    <label>To
+      <input type="datetime-local" x-model="filters.to" @change="page=0; load()">
+    </label>
+    <label>Status
+      <select x-model="filters.status" @change="page=0; load()">
+        <option value="">all</option>
+        <option value="success">success</option>
+        <option value="partial">partial</option>
+        <option value="failed">failed</option>
+      </select>
+    </label>
+    <label>Error class
+      <select x-model="filters.error_class" @change="page=0; load()">
+        <option value="">all</option>
+        <template x-for="ec in errorClasses" :key="ec">
+          <option :value="ec" x-text="ec"></option>
+        </template>
+      </select>
+    </label>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Status</th><th>Incident</th><th>Error class</th>
+        <th>Confidence</th><th>Duration</th><th>Started</th>
+      </tr>
+    </thead>
+    <tbody>
+      <template x-for="run in runs" :key="run.run_id">
+        <!-- each row links to the detail/live view (#49) -->
+        <tr class="row" @click="window.location = `/dashboard/run.html?run_id=${run.run_id}`">
+          <td><span class="badge" :class="run.status" x-text="run.status"></span></td>
+          <td x-text="run.incident_number"></td>
+          <td x-text="run.error_class ?? '—'"></td>
+          <td x-text="run.confidence_band ?? '—'"></td>
+          <td x-text="fmtDuration(run.duration_ms)"></td>
+          <td x-text="fmtRelative(run.start_time)" :title="run.start_time"></td>
+        </tr>
+      </template>
+      <tr x-show="runs.length === 0"><td colspan="6" class="muted">No runs match the current filters.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="pager">
+    <button @click="page--; load()" :disabled="page === 0">← Prev</button>
+    <span x-text="`page ${page + 1} of ${Math.max(1, Math.ceil(total / limit))}`"></span>
+    <button @click="page++; load()" :disabled="(page + 1) * limit >= total">Next →</button>
+  </div>
+
+  <script>
+    function runList() {
+      return {
+        runs: [], total: 0, page: 0, limit: 25,
+        filters: { from: "", to: "", status: "", error_class: "" },
+        errorClasses: [],
+
+        // Re-query the API with the current filters + page. Server-side only:
+        // the filters map 1:1 onto GET /api/v1/runs query params.
+        async load() {
+          const p = new URLSearchParams({ limit: this.limit, offset: this.page * this.limit });
+          if (this.filters.from) p.set("from", new Date(this.filters.from).toISOString());
+          if (this.filters.to) p.set("to", new Date(this.filters.to).toISOString());
+          if (this.filters.status) p.set("status", this.filters.status);
+          if (this.filters.error_class) p.set("error_class", this.filters.error_class);
+          const body = await (await fetch(`/api/v1/runs?${p}`)).json();
+          this.runs = body.runs;
+          this.total = body.total;
+          // Grow the error-class dropdown from observed values (cheap, no extra endpoint).
+          for (const r of body.runs) {
+            if (r.error_class && !this.errorClasses.includes(r.error_class)) {
+              this.errorClasses.push(r.error_class);
+            }
+          }
+        },
+
+        fmtDuration(ms) {
+          if (ms == null) return "—";
+          const s = Math.round(ms / 1000);
+          return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`;
+        },
+
+        fmtRelative(iso) {
+          const sec = Math.round((Date.now() - new Date(iso)) / 1000);
+          if (sec < 60) return `${sec}s ago`;
+          if (sec < 3600) return `${Math.floor(sec / 60)}m ago`;
+          if (sec < 86400) return `${Math.floor(sec / 3600)}h ago`;
+          return new Date(iso).toLocaleString();
+        },
+      };
+    }
+  </script>
+</body>
+</html>

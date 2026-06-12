@@ -10,7 +10,7 @@ ReDoc available at:       http://localhost:8000/redoc
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from api.routers import agent1, agent2, agent3, agent4, health, monitoring, pipeline
+from api.routers import agent1, agent2, agent3, agent4, dashboard, health, monitoring, pipeline
 from core.logging_config import configure_logging
 from core.observability import get_logger
 
@@ -40,6 +40,9 @@ app.include_router(agent3.router, prefix="/api/v1")
 app.include_router(agent4.router, prefix="/api/v1")
 app.include_router(pipeline.router, prefix="/api/v1")
 app.include_router(monitoring.router, prefix="/api/v1")
+# Dashboard pages live at /dashboard (no /api/v1 prefix — they are HTML, not API).
+# Every route 404s unless ARIA_DASHBOARD_ENABLED is set.
+app.include_router(dashboard.router)
 
 # ── Global error handler — always return JSON, never HTML ──────────────────────
 
