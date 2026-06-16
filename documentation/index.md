@@ -28,4 +28,5 @@ ARIA automates all four steps. Phase 1 is **notify-only**: ARIA presents its fin
 - [Agent descriptions](architecture/agents.md)
 - [Interface & plugin system](architecture/interfaces.md)
 - [Core data models](architecture/data-models.md)
-- [Getting started](guides/getting-started.md)
+- [Getting started (local dev)](guides/getting-started.md)
+- [Installation guide (Docker + Kubernetes)](guides/installation.md)
