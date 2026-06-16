@@ -242,9 +242,12 @@ class LogExtractorAgent:
         )
 
         data = json.loads(response)
+        raw_paths = list(data.get("log_paths", []))
         return LogQueryPlan(
             connector_name=str(data["connector_name"]),
-            log_paths=list(data.get("log_paths", [])),
+            # Validate LLM-planned paths against safe prefixes to prevent path-injection
+            # from adversarial log content coercing the LLM toward /etc/ or ~/ targets (#85).
+            log_paths=_validate_log_paths(raw_paths),
             keywords=list(data.get("keywords", [])),
             time_window_minutes=int(data.get("time_window_minutes", _DEFAULT_WINDOW)),
             reasoning=str(data.get("reasoning", "")),
@@ -496,3 +499,27 @@ def _empty(host: str, platform_tag: PlatformTag) -> LogQueryResult:
         total_scanned=0,
         confidence=ConfidenceBand.LOW,
     )
+
+
+# Allowed log path prefixes for LLM-planned paths (#85).
+# Paths outside these prefixes are dropped before being passed to connectors.
+# Mirrors the CI-name allowlist used for host resolution in _resolve_ci_from_request().
+_SAFE_LOG_PREFIXES: tuple[str, ...] = ("/var/log/",)
+
+
+def _validate_log_paths(paths: list[str]) -> list[str]:
+    """Filter LLM-planned log paths to known-safe directory prefixes.
+
+    Prevents adversarial log content from coercing the LLM into planning paths
+    that point outside log directories (e.g. /etc/ssh/, ~/.ssh/). Any path that
+    does not start with an allowed prefix is dropped with a warning.
+    """
+    safe = [p for p in paths if any(p.startswith(prefix) for prefix in _SAFE_LOG_PREFIXES)]
+    dropped = len(paths) - len(safe)
+    if dropped:
+        logger.warning(
+            "Agent 2: dropped %d LLM-planned log path(s) outside allowed prefixes %s",
+            dropped,
+            _SAFE_LOG_PREFIXES,
+        )
+    return safe

@@ -54,6 +54,7 @@ class GCPLogConnector(LogStoreInterface):
         vault: VaultInterface,
         sa_key_secret: str = "GCP_SA_JSON",
         project_id: str | None = None,
+        resource_types: list[str] | None = None,
     ) -> None:
         """Initialise the GCP log connector.
 
@@ -63,10 +64,17 @@ class GCPLogConnector(LogStoreInterface):
                            Defaults to 'GCP_SA_JSON'.
             project_id: Override the GCP project ID. When None, the project_id field
                         from the service account JSON is used instead.
+            resource_types: Optional list of resource.type values to scope Cloud Logging
+                            queries (e.g. ['cloud_dataproc_cluster', 'cloud_dataproc_job']
+                            for UC2 Dataproc). When provided, a resource.type OR-clause is
+                            added to the filter and resource.labels.cluster_name is included
+                            as an additional host label alias. S6 will replace this with a
+                            configurable resource_type_templates dict.
         """
         self._vault = vault
         self._sa_key_secret = sa_key_secret
         self._project_id = project_id
+        self._resource_types = resource_types
 
     # ── LogStoreInterface ─────────────────────────────────────────────────────
 
@@ -112,7 +120,7 @@ class GCPLogConnector(LogStoreInterface):
             logger.warning("GCPLogConnector auth failed: %s", exc)
             raise LogStoreUnavailableError(f"GCP Cloud Logging auth failed: {exc}") from exc
 
-        filter_str = _build_filter(host, start_time, end_time, keywords)
+        filter_str = _build_filter(host, start_time, end_time, keywords, self._resource_types)
         logger.debug("GCPLogConnector filter: %s", filter_str)
 
         try:
@@ -192,11 +200,18 @@ def _escape_filter_string(value: str) -> str:
 
 
 def _build_filter(
-    host: str, start_time: datetime, end_time: datetime, keywords: list[str] | None
+    host: str,
+    start_time: datetime,
+    end_time: datetime,
+    keywords: list[str] | None,
+    resource_types: list[str] | None = None,
 ) -> str:
     """Build a GCP Cloud Logging filter string for the given host, time window, and keywords.
 
     Filters on timestamp range, severity >= WARNING, and resource labels for the host.
+    When resource_types is provided, an OR-combined resource.type clause is added and
+    resource.labels.cluster_name is included as an additional host label alias (required
+    for Dataproc, which uses cluster_name rather than instance_id).
     Keywords are applied as textPayload contains clauses (OR-combined, max 10, max 100 chars each).
     The host value is validated against a safe character regex before being embedded in the filter
     to prevent log filter injection.
@@ -206,6 +221,8 @@ def _build_filter(
         start_time: Start of the query window.
         end_time: End of the query window.
         keywords: Optional list of keywords to match in the log text.
+        resource_types: Optional list of resource.type values to scope the query
+                        (e.g. ['cloud_dataproc_cluster', 'cloud_dataproc_job']).
 
     Returns:
         A GCP log filter string ready for list_entries(filter_=...).
@@ -218,14 +235,21 @@ def _build_filter(
         f'timestamp <= "{_rfc3339(end_time)}"',
         "severity >= WARNING",
     ]
+    if resource_types:
+        safe_types = [_escape_filter_string(rt) for rt in resource_types if rt]
+        if safe_types:
+            rt_parts = " OR ".join(f'resource.type="{rt}"' for rt in safe_types)
+            parts.append(f"({rt_parts})")
     if host:
         if not _SAFE_HOST_RE.match(host):
             raise ValueError(f"Invalid host value for GCP filter: {host!r}")
         safe_host = _escape_filter_string(host)
+        # cluster_name is included for Dataproc; instance_id/pod_name/job_id for VMs/GKE/CF.
         parts.append(
             f'(resource.labels.instance_id="{safe_host}" OR '
             f'resource.labels.pod_name="{safe_host}" OR '
-            f'resource.labels.job_id="{safe_host}")'
+            f'resource.labels.job_id="{safe_host}" OR '
+            f'resource.labels.cluster_name="{safe_host}")'
         )
     if keywords:
         safe_kws = [_escape_filter_string(k) for k in keywords[:10] if k and len(k) <= 100]

@@ -197,3 +197,39 @@ def test_vault_key_name_used():
         connector.query_logs(_HOST, PlatformTag.GCP, _START, _END)
 
     vault.get_secret.assert_called_once_with("MY_GCP_SA")
+
+
+# ── resource_types filter (UC2 Dataproc) ────────────────────────────────────
+
+
+def test_filter_resource_types_clause():
+    """Verify that resource_types produces an OR-combined resource.type clause in the filter."""
+    f = _build_filter(
+        _HOST,
+        _START,
+        _END,
+        keywords=None,
+        resource_types=["cloud_dataproc_cluster", "cloud_dataproc_job"],
+    )
+    assert 'resource.type="cloud_dataproc_cluster"' in f
+    assert 'resource.type="cloud_dataproc_job"' in f
+
+
+def test_filter_resource_types_includes_cluster_name_label():
+    """Verify that cluster_name is included as a host label alias when resource_types is set."""
+    f = _build_filter(
+        _HOST,
+        _START,
+        _END,
+        keywords=None,
+        resource_types=["cloud_dataproc_cluster"],
+    )
+    assert f'resource.labels.cluster_name="{_HOST}"' in f
+
+
+def test_filter_no_resource_types_preserves_existing_labels():
+    """Verify that omitting resource_types leaves the filter unchanged (backward compat)."""
+    f_with = _build_filter(_HOST, _START, _END, keywords=None, resource_types=None)
+    f_without = _build_filter(_HOST, _START, _END, keywords=None)
+    assert f_with == f_without
+    assert "resource.type" not in f_with

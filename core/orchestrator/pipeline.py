@@ -21,6 +21,7 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
 import core.config as cfg
+from core.exceptions import ClassificationError
 from core.interfaces.run_state_store import RunStateStoreInterface
 from core.interfaces.run_store import RunStoreInterface
 from core.logging_config import configure_logging
@@ -129,13 +130,30 @@ class ARIAPipeline:
         }
 
     def _agent3_node(self, state: PipelineState) -> dict:
-        """LangGraph node wrapper for Agent 3. Returns classification and any pending log request."""
+        """LangGraph node wrapper for Agent 3. Returns classification and any pending log request.
+
+        ClassificationError is caught here rather than propagated — if Agent 3 cannot
+        classify, the error is recorded in state and the pipeline routes to Agent 4 so
+        the notify-only guarantee is never violated (#83).
+        """
         self._track_agent(state, "agent3")
-        result = self._agent3.run(state)
-        return {
-            "classification": result.classification,
-            "pending_log_request": result.pending_log_request,
-        }
+        try:
+            result = self._agent3.run(state)
+            return {
+                "classification": result.classification,
+                "pending_log_request": result.pending_log_request,
+            }
+        except ClassificationError as exc:
+            logger.error(
+                "agent3: ClassificationError for %s — routing to agent4 with error: %s",
+                state.incident_number,
+                exc,
+            )
+            return {
+                "classification": None,
+                "pending_log_request": None,
+                "error": str(exc),
+            }
 
     def _agent4_node(self, state: PipelineState) -> dict:
         """LangGraph node wrapper for Agent 4. Returns notification_sent and any delivery error."""

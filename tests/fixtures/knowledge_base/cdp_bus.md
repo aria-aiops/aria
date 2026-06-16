@@ -1,11 +1,16 @@
 # CDP Bus Data Pipeline Runbook
-This runbook configures messaging brokers and event buses running on the cdp bus tier.
+This runbook covers the cdp bus node layer (Kafka broker, ZooKeeper ensemble).
+TF node name: cdp-bus-01. NiFi is co-located on the bus node in some deployments.
 
 ## Log Paths
-Message streaming components write operational logs here:
-* Kafka Engine Event Stream: /var/log/kafka/server.log
-* ZooKeeper Coordination Cluster Log: /var/log/zookeeper/zookeeper.log
+* Kafka broker: /var/log/kafka/server.log
+* ZooKeeper: /var/log/zookeeper/zookeeper.log
 
 ## Target Error Keywords
-Monitor trace streams for active ingestion or validation failures:
+Monitor for messaging and coordination layer failures:
+* Kafka
+* ZooKeeper
 * timeout
+* FATAL
+* Connection refused
+* AuthenticationException

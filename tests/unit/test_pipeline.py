@@ -4,6 +4,7 @@ from datetime import datetime
 from unittest.mock import MagicMock
 
 from core.agents.classifier import ClassifierAgent
+from core.exceptions import ClassificationError
 from core.models import (
     ClassificationResult,
     ConfidenceBand,
@@ -259,3 +260,22 @@ def test_pipeline_never_raises_on_unhandled_exception():
     assert result.error is not None
     assert "unexpected crash" in result.error
     assert result.notification_sent is False
+
+
+def test_agent3_classification_error_still_routes_to_agent4():
+    """Verify Agent 4 runs even when Agent 3 raises ClassificationError (#83).
+
+    A ClassificationError must not abort the pipeline — the notify-only guarantee
+    requires Agent 4 to always produce a notification (possibly a partial one with
+    the error surfaced). If Agent 4 is skipped, AC-06 cannot be met for any run
+    where Agent 3 fails due to a transient LLM error.
+    """
+    a3 = MagicMock()
+    a3.run.side_effect = ClassificationError("LLM call failed: 503 Service Unavailable")
+
+    pipeline = _make_pipeline(agent3=a3)
+    result = pipeline.run("INC0000001")
+
+    assert result.notification_sent is True
+    assert result.error is not None
+    assert "LLM call failed" in result.error

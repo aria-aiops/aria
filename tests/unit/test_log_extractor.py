@@ -4,7 +4,7 @@ import json
 from datetime import datetime
 from unittest.mock import MagicMock
 
-from core.agents.log_extractor import LogExtractorAgent
+from core.agents.log_extractor import LogExtractorAgent, _validate_log_paths
 from core.interfaces.knowledge_base import KnowledgeBaseInterface
 from core.interfaces.llm_client import LLMClientInterface
 from core.interfaces.log_store import LogStoreInterface
@@ -418,3 +418,30 @@ def test_pending_log_request_unknown_ci_returns_state_unchanged():
     connector.query_logs.assert_not_called()
     assert result.log_result is original_result  # unchanged
     assert result.error is None
+
+
+# ── _validate_log_paths (#85) ─────────────────────────────────────────────────
+
+
+def test_validate_log_paths_keeps_safe_paths():
+    """Paths under /var/log/ are kept unchanged."""
+    paths = ["/var/log/hadoop/hdfs/hadoop.log", "/var/log/kafka/server.log"]
+    assert _validate_log_paths(paths) == paths
+
+
+def test_validate_log_paths_drops_unsafe_paths():
+    """Paths outside /var/log/ are dropped to prevent path-injection (#85)."""
+    paths = ["/etc/ssh/authorized_keys", "/home/aria/.ssh/id_rsa", "/var/log/hadoop/hdfs.log"]
+    result = _validate_log_paths(paths)
+    assert result == ["/var/log/hadoop/hdfs.log"]
+
+
+def test_validate_log_paths_empty_list():
+    """Empty input produces empty output."""
+    assert _validate_log_paths([]) == []
+
+
+def test_validate_log_paths_all_unsafe_returns_empty():
+    """All-unsafe input produces an empty list — connector receives no paths."""
+    paths = ["/etc/passwd", "~/.bashrc", "../../../etc/shadow"]
+    assert _validate_log_paths(paths) == []

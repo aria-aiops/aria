@@ -56,12 +56,24 @@ gcp:                        # only required when connectors.log = gcp
 
 cdp:
   ssh_user: hadoop           # OS user with read access to log directories below
-  log_dirs:                  # directories searched for logs on CDP cluster nodes
-    - /var/log/hadoop-hdfs   # leave unset to use these defaults
-    - /var/log/hadoop-yarn
+  ssh_key_secret: CDP_SSH_KEY  # vault key name for the SSH private key PEM.
+                               # EnvVarVault: reads os.environ[ssh_key_secret] directly.
+                               # GCPSecretManagerVault: normalises underscores→hyphens and
+                               # prepends 'aria-', so 'CDP_SSH_KEY' → GCP secret 'aria-cdp-ssh-key'.
+                               # UC1 (TF): TF provisions secret 'aria-uc1-ssh-private-key'.
+                               # Set ssh_key_secret: CDP_UC1_SSH_PRIVATE_KEY to match, or
+                               # rename the TF secret to 'aria-cdp-ssh-key'.
+  log_dirs:                  # directories searched for logs on CDP cluster nodes.
+                             # UC1 (TF Hadoop VMs) use subdirectory paths — set these
+                             # at deployment time from TF startup script:
+    - /var/log/hadoop/hdfs   # TF UC1 NameNode / DataNode logs
+    - /var/log/hadoop/yarn   # TF UC1 ResourceManager / NodeManager logs
     - /var/log/hive
-    - /var/log/oozie
     - /var/log/spark
+    - /var/log/kafka
+    - /var/log/zookeeper
+    - /var/log/oozie
+    - /var/log/nifi
 
 slack:
   channel_id: <your-slack-channel-id>   # channel where Agent 4 posts notifications

@@ -20,8 +20,8 @@ class TestFileKnowledgeBaseInit:
     """Tests that FileKnowledgeBase initialises correctly from a directory of runbook files."""
 
     def test_loads_fixture_files(self, kb):
-        """Verify that two fixture runbook files are loaded on initialisation."""
-        assert len(kb._files) == 2
+        """Verify all fixture runbook files loaded (2 legacy + 3 UC1 + 2 UC2 + 1 UC3)."""
+        assert len(kb._files) == 8
 
     def test_raises_on_missing_directory(self):
         """Verify that a non-existent directory path raises KnowledgeBaseError."""
@@ -89,3 +89,61 @@ class TestGetLogHints:
         """Verify that the platform_tag supplied to get_log_hints is echoed in the returned hint."""
         hint = kb.get_log_hints("yarn-resourcemanager", PlatformTag.CDP)
         assert hint.platform_tag == PlatformTag.CDP
+
+
+class TestUC1RunbookAcceptance:
+    """Acceptance tests for UC1 (Hadoop VMs) runbooks — validates TF log path alignment.
+
+    These tests assert the exact log paths and keywords that SSHLogConnector will use
+    when querying UC1 nodes. Paths must match the TF-provisioned subdirectory layout
+    (e.g. /var/log/hadoop/hdfs, not /var/log/hadoop-hdfs). See issue #60.
+    """
+
+    def test_cdp_master_log_paths_and_keywords(self, kb):
+        """cdp-master-01: HDFS and YARN log paths extracted; OOM keyword present."""
+        hint = kb.get_log_hints("cdp-master-01", PlatformTag.CDP)
+        assert any("/var/log/hadoop/hdfs" in p for p in hint.log_paths)
+        assert any("/var/log/hadoop/yarn" in p for p in hint.log_paths)
+        assert "OutOfMemory" in hint.keywords
+        assert "FATAL" in hint.keywords
+
+    def test_cdp_bus_log_paths_and_keywords(self, kb):
+        """cdp-bus-01: Kafka and ZooKeeper log paths extracted; Kafka keyword present."""
+        hint = kb.get_log_hints("cdp-bus-01", PlatformTag.CDP)
+        assert any("/var/log/kafka" in p for p in hint.log_paths)
+        assert any("/var/log/zookeeper" in p for p in hint.log_paths)
+        assert "Kafka" in hint.keywords
+        assert "ZooKeeper" in hint.keywords
+
+    def test_cdp_utility_log_paths_and_keywords(self, kb):
+        """cdp-utility-01: Hive, Spark, Oozie, NiFi paths extracted; Hive keyword present."""
+        hint = kb.get_log_hints("cdp-utility-01", PlatformTag.CDP)
+        assert any("/var/log/hive" in p for p in hint.log_paths)
+        assert any("/var/log/spark" in p for p in hint.log_paths)
+        assert any("/var/log/oozie" in p for p in hint.log_paths)
+        assert any("/var/log/nifi" in p for p in hint.log_paths)
+        assert "Hive" in hint.keywords
+        assert "Spark" in hint.keywords
+
+
+class TestUC2RunbookAcceptance:
+    """Acceptance tests for UC2 (GCP Dataproc) runbooks — validates Cloud Logging keyword coverage.
+
+    Dataproc runbooks carry no log paths (Cloud Logging is API-based). The tests confirm
+    that the expected keywords are extracted so SSHLogConnector keyword filters and
+    GCPLogConnector textPayload filters both have the right signal set. See issue #63.
+    """
+
+    def test_dataproc_cluster_keywords(self, kb):
+        """dataproc_cluster runbook returns YARN, OutOfMemory, and AuthenticationException."""
+        hint = kb.get_log_hints("dataproc-cluster", PlatformTag.GCP)
+        assert "OutOfMemory" in hint.keywords
+        assert "YARN" in hint.keywords
+        assert "AuthenticationException" in hint.keywords
+
+    def test_dataproc_job_keywords(self, kb):
+        """dataproc_job runbook returns Spark, OutOfMemory, and DiskOutOfSpaceException."""
+        hint = kb.get_log_hints("dataproc-job", PlatformTag.GCP)
+        assert "Spark" in hint.keywords
+        assert "OutOfMemory" in hint.keywords
+        assert "DiskOutOfSpaceException" in hint.keywords
