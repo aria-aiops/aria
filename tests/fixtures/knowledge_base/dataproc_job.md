@@ -1,7 +1,7 @@
 # GCP Dataproc Job Runbook
 This runbook covers Dataproc job execution failures: Spark driver crashes, executor OOM,
 quota exceeded, SA key expiry, driver node timeouts, and init action failures.
-GCP resource type: cloud_dataproc_job. UC2 cluster: aria-uc2-cluster.
+GCP resource type: cloud_dataproc_job. UC2 job runner: aria-uc2-dataproc.
 
 ## Log Paths
 Cloud Logging API — no local SSH paths. Filter by resource.type = "cloud_dataproc_job".
