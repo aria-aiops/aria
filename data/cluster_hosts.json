@@ -1,16 +1,8 @@
 {
-  "_comment": "CI name → IP mapping for Agent 2 ReAct loop. Used when Agent 3 requests logs from a service different from the primary affected_ci. All test CIs resolve to localhost (127.0.0.1) since this VPS simulates the full cluster.",
-  "cdp-dn-01": "127.0.0.1",
-  "cdp-nn-01": "127.0.0.1",
-  "cdp-hms-01": "127.0.0.1",
-  "cdp-rm-01": "127.0.0.1",
-  "cdp-zk-01": "127.0.0.1",
-  "cdp-dn-02": "127.0.0.1",
-  "cdp-nn-02": "127.0.0.1",
-  "cdp-hs2-02": "127.0.0.1",
-  "cdp-dn-03": "127.0.0.1",
-  "cdp-cluster-prod": "127.0.0.1",
-  "cdp-rm-02": "127.0.0.1",
-  "cdp-hms-02": "127.0.0.1",
-  "cdp-hs2-03": "127.0.0.1"
+  "_comment": "CI name → IP mapping for Agent 2 ReAct loop cross-service resolution. Keys must match the CI names in ServiceNow CMDB. IPs are populated from Terraform output after UC1 cluster apply: terraform -chdir=infra/terraform/uc_testing/uc1-hadoop-onprem output -json node_internal_ips",
+  "cdp-master-01": "POPULATE_FROM_TF_OUTPUT",
+  "cdp-data-01": "POPULATE_FROM_TF_OUTPUT",
+  "cdp-data-02": "POPULATE_FROM_TF_OUTPUT",
+  "cdp-utility-01": "POPULATE_FROM_TF_OUTPUT",
+  "cdp-bus-01": "POPULATE_FROM_TF_OUTPUT"
 }

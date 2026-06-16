@@ -274,3 +274,36 @@ def test_log_request_field_absent_classifies_normally() -> None:
     assert state.classification is not None
     assert state.classification.error_class == "oom"
     assert state.pending_log_request is None
+
+
+# ── Retry logic (#83) ─────────────────────────────────────────────────────────
+
+
+def test_llm_retry_succeeds_on_second_attempt() -> None:
+    """Transient LLM failure recovers on retry — ClassificationError is not raised (#83)."""
+    llm = MagicMock(spec=LLMClientInterface)
+    llm.complete.side_effect = [
+        Exception("503 Service Unavailable"),
+        json.dumps(_oom_response()),
+    ]
+
+    with __import__("unittest.mock", fromlist=["patch"]).patch("time.sleep"):
+        agent = ClassifierAgent(llm_client=llm)
+        state = agent.run(_make_state())
+
+    assert state.classification is not None
+    assert state.classification.error_class == "oom"
+    assert llm.complete.call_count == 2
+
+
+def test_llm_retry_exhausted_raises_classification_error() -> None:
+    """Two consecutive LLM failures raise ClassificationError after retry (#83)."""
+    llm = MagicMock(spec=LLMClientInterface)
+    llm.complete.side_effect = Exception("persistent failure")
+
+    with __import__("unittest.mock", fromlist=["patch"]).patch("time.sleep"):
+        agent = ClassifierAgent(llm_client=llm)
+        with pytest.raises(ClassificationError, match="LLM call failed"):
+            agent.run(_make_state())
+
+    assert llm.complete.call_count == 2

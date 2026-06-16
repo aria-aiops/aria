@@ -10,6 +10,7 @@ error_class='unknown', LOW confidence, no evidence.
 """
 
 import json
+import time
 from typing import Any
 
 from core.exceptions import ClassificationError
@@ -109,16 +110,36 @@ class ClassifierAgent:
         logger.info("classifier: running for %s", state.incident_number)
 
         messages = self._build_messages(state)
-        try:
-            raw = self._llm.complete(
-                messages,
-                system=_SYSTEM_PROMPT,
-                temperature=0.0,
-                max_tokens=1024,
+        # Retry once with a 1-second backoff before surfacing as ClassificationError (#83).
+        # A transient LLM failure must not kill Agent 4 — the notify-only guarantee requires
+        # Agent 4 to always run, even when Agent 3 cannot classify.
+        _llm_exc: Exception | None = None
+        for attempt in range(2):
+            try:
+                raw = self._llm.complete(
+                    messages,
+                    system=_SYSTEM_PROMPT,
+                    temperature=0.0,
+                    max_tokens=1024,
+                )
+                _llm_exc = None
+                break
+            except Exception as exc:
+                _llm_exc = exc
+                if attempt == 0:
+                    logger.warning(
+                        "classifier: LLM call failed for %s (attempt 1/2), retrying: %s",
+                        state.incident_number,
+                        exc,
+                    )
+                    time.sleep(1)
+        if _llm_exc is not None:
+            logger.error(
+                "classifier: LLM call failed for %s after 2 attempts: %s",
+                state.incident_number,
+                _llm_exc,
             )
-        except Exception as exc:
-            logger.error("classifier: LLM call failed for %s: %s", state.incident_number, exc)
-            raise ClassificationError(f"LLM call failed: {exc}") from exc
+            raise ClassificationError(f"LLM call failed: {_llm_exc}") from _llm_exc
 
         try:
             classification, log_request = self._parse_response(raw)

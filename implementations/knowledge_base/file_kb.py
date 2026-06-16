@@ -23,7 +23,9 @@ _MEDIUM_SCORE = 0.05
 _LOG_PATH_RE = re.compile(r"/[\w./-]*\.log[\w/.-]*|/var/log/[\w/.-]+")
 _KEYWORD_RE = re.compile(
     r"\b(ERROR|WARN|FATAL|OOM|OutOfMemory|disk full|timeout|"
-    r"connection refused|HDFS|YARN|Hive|Spark|Oozie|safe mode)\b",
+    r"connection refused|HDFS|YARN|Hive|Spark|Oozie|safe mode|"
+    r"Kafka|ZooKeeper|NiFi|AuthenticationException|DiskOutOfSpaceException|"
+    r"GC overhead)\b",
     re.IGNORECASE,
 )
 
