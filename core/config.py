@@ -1,9 +1,11 @@
 """Runtime configuration loader.
 
-Reads non-secret configuration from conf.yaml (project root).
+Reads non-secret configuration from conf.yaml.  The path defaults to
+conf.yaml in the working directory but can be overridden by setting
+ARIA_CONFIG_PATH (e.g. to /etc/aria/conf.yaml when mounted via ConfigMap).
 Falls back to environment variables when conf.yaml is absent (CI, Docker).
 Secrets (passwords, API keys, tokens) are never read here — they come from
-the process environment injected by Infisical or a local .env file.
+the process environment injected by Infisical or a vault implementation.
 """
 
 import os
@@ -13,13 +15,14 @@ from pathlib import Path
 
 @lru_cache(maxsize=1)
 def _raw() -> dict:
-    """Load and cache the contents of conf.yaml.
+    """Load and cache the contents of the config file.
 
+    The path is resolved once from ARIA_CONFIG_PATH (default: conf.yaml).
     Returns an empty dict if the file does not exist or cannot be parsed,
     so callers can always fall back to environment variables without crashing.
-    The lru_cache ensures we only read the file once per process lifetime.
+    Call _raw.cache_clear() in tests when switching ARIA_CONFIG_PATH.
     """
-    path = Path("conf.yaml")
+    path = Path(os.environ.get("ARIA_CONFIG_PATH", "conf.yaml"))
     if not path.exists():
         return {}
     try:
@@ -107,6 +110,27 @@ def resolve_model(agent_num: str) -> str | None:
     if llm_mode() == "global":
         return llm_global_model()
     return llm_agent_model(agent_num)
+
+
+def llm_provider() -> str:
+    """Return the LLM provider to use for all agents.
+
+    Values: 'anthropic' (default) | 'claude_code' | 'vertex_ai'.
+    - anthropic:   direct Anthropic API — requires ANTHROPIC_API_KEY.
+    - claude_code: local Claude Code CLI — safe for local dev only (#84).
+    - vertex_ai:   GCP Vertex AI via ADC — no API key needed in container.
+    Can be set via llm.provider in conf.yaml or ARIA_LLM_PROVIDER env var.
+    """
+    return _get(["llm", "provider"], "ARIA_LLM_PROVIDER", "anthropic")
+
+
+def vault_backend() -> str:
+    """Return the vault backend for secret retrieval.
+
+    Values: 'env' (default) | 'gcp' | 'hashicorp' | 'aws' | 'azure'.
+    Can be set via runtime.vault_backend in conf.yaml or ARIA_VAULT_BACKEND env var.
+    """
+    return _get(["runtime", "vault_backend"], "ARIA_VAULT_BACKEND", "env")
 
 
 # ── CDP ───────────────────────────────────────────────────────────────────────

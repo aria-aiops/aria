@@ -549,6 +549,51 @@ uvicorn api.main:app --reload
 
 ---
 
+## Deployment
+
+ARIA ships as a single Docker image. No Python installation is required on the target machine — only Docker (local/VM) or a Kubernetes cluster (production). The same image works across all environments; what changes is how `conf.yaml` and secrets are injected.
+
+### Docker (local machine or VM)
+
+```bash
+# 1. Build
+docker build -t aria:latest .
+
+# 2. Run — mount your conf.yaml; pass secrets as env vars
+docker run -d \
+  --name aria \
+  -p 8000:8000 \
+  -v /path/to/conf.yaml:/etc/aria/conf.yaml:ro \
+  -e ARIA_CONFIG_PATH=/etc/aria/conf.yaml \
+  -e SNOW_PASSWORD=<your-password> \
+  -e ANTHROPIC_API_KEY=<your-key> \
+  -e SLACK_BOT_TOKEN=<your-token> \
+  aria:latest
+
+# 3. Verify
+curl http://localhost:8000/api/v1/health
+```
+
+### Kubernetes
+
+`conf.yaml` is delivered via a ConfigMap; secrets via a Kubernetes Secret or GCP Secret Manager (Workload Identity, no API key in the pod):
+
+```bash
+kubectl create namespace aria
+kubectl create configmap aria-config --from-file=conf.yaml=./conf.yaml -n aria
+kubectl create secret generic aria-secrets \
+  --from-literal=SNOW_PASSWORD=<pw> \
+  --from-literal=ANTHROPIC_API_KEY=<key> \
+  --from-literal=SLACK_BOT_TOKEN=<token> \
+  -n aria
+```
+
+Then apply a Deployment that mounts the ConfigMap at `/etc/aria/conf.yaml` and sets `ARIA_CONFIG_PATH=/etc/aria/conf.yaml`. For GCP clusters, set `llm.provider: vertex_ai` and `runtime.vault_backend: gcp` in `conf.yaml` — the pod authenticates via Workload Identity with no credentials in the container.
+
+**Full guide** (conf.yaml preparation, docker-compose, GKE Deployment + Service YAML, LLM provider selection, vault backend options): [documentation/guides/installation.md](documentation/guides/installation.md)
+
+---
+
 ## Acceptance criteria (Phase 1)
 
 Phase 1 is complete when all of the following pass on 10 consecutive test incidents:
@@ -580,8 +625,8 @@ Phase 1 is complete when all of the following pass on 10 consecutive test incide
 | Phase 1 | S8: ReAct loop trigger — cross-service log requests | ✅ Done |
 | Phase 1 | M7: Acceptance criteria validated on local environment | ✅ Done |
 | Phase 1.5 | S1: Structured logging — structlog, `run_id`, lifecycle events, RunRecord | ✅ Done |
-| **Phase 1.5** | **S2: Monitoring foundation — run store, REST API, Alpine.js dashboard, mode scaffold** | 🔜 Next |
-| Phase 1.5 | S3: Docker + `ARIA_CONFIG_PATH` + `VertexAILLMClient` + LLM provider DI | 🔜 Planned |
+| Phase 1.5 | S2: Monitoring foundation — run store, REST API, Alpine.js dashboard, mode scaffold | ✅ Done |
+| Phase 1.5 | S3: Docker + `ARIA_CONFIG_PATH` + `VertexAILLMClient` + LLM provider DI (incl. #84 security fix) | ✅ Done |
 | Phase 1.5 | S4: Testing infrastructure — UC1/UC2/UC3 cluster wiring, KB runbooks, CMDB validation | 🔜 Planned |
 | Phase 1.5 | S5: Round 2 acceptance testing — 30 incidents on UC1 + UC2 real infrastructure | 🔜 Planned |
 | Phase 1.5 | S6: GCP native connectors — BQ, Cloud Functions, Pub/Sub, GCS | 🔜 Planned |
