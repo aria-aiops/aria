@@ -61,12 +61,15 @@ class TestConstruction:
         monkeypatch.setenv("GCP_PROJECT_ID", "from-env-project")
         # Re-import so from_env picks up the fresh env var.
         import importlib
+        import sys
 
-        import implementations.vault.gcp_secret_manager as mod
+        from implementations.vault.gcp_secret_manager import GCPSecretManagerVault as _V
 
-        importlib.reload(mod)
+        importlib.reload(sys.modules[_V.__module__])
+        from implementations.vault.gcp_secret_manager import GCPSecretManagerVault as _V2
+
         monkeypatch.setenv("GCP_PROJECT_ID", "env-project")
-        vault2 = mod.GCPSecretManagerVault.from_env()
+        vault2 = _V2.from_env()
         assert vault2._project_id == "env-project"
 
     def test_from_env_raises_if_no_project_id(self, mock_gcp_secretmanager, monkeypatch):

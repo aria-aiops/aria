@@ -181,10 +181,6 @@ class TestGemini:
     def test_permission_denied_raises_llm_auth_error(self):
         """A 403/PermissionDenied from Gemini maps to LLMAuthError."""
         client = self._make_client()
-
-        class PermissionDenied(Exception):
-            pass
-
         with patch.object(client, "_complete_gemini", side_effect=LLMAuthError("403")):
             with pytest.raises(LLMAuthError):
                 client.complete(MESSAGES)
