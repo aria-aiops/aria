@@ -1,0 +1,35 @@
+# Version control
+.git/
+.gitignore
+
+# Python artifacts
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+.mypy_cache/
+.ruff_cache/
+
+# Tests and fixtures — not needed in the image
+tests/
+
+# Dev and internal docs
+.docs/
+.claude/
+
+# Infrastructure-as-code — not part of the application
+infra/
+
+# Runtime data — always mounted at runtime, never baked in
+logs/
+data/
+conf.yaml
+
+# Secrets — never in the image
+.env
+.env.*

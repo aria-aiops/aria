@@ -1,0 +1,40 @@
+services:
+  aria:
+    build:
+      context: ../..        # project root
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      # Config file path — the conf.yaml below is bind-mounted here.
+      ARIA_CONFIG_PATH: /etc/aria/conf.yaml
+
+      # Log directory — written to the named volume below.
+      ARIA_LOG_DIR: /var/log/aria
+
+      # Enable the built-in ops dashboard.
+      ARIA_DASHBOARD_ENABLED: "true"
+
+      # Secrets — passed as env vars (EnvVarVault default).
+      # Replace these with real values or use a .env file (not committed).
+      SNOW_PASSWORD: "${SNOW_PASSWORD}"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY}"
+      SLACK_BOT_TOKEN: "${SLACK_BOT_TOKEN}"
+
+    volumes:
+      # Operator-provided config file (copy from conf.yaml.example and fill in).
+      - ./conf.yaml:/etc/aria/conf.yaml:ro
+
+      # Persistent log storage.
+      - aria_logs:/var/log/aria
+
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 15s
+      retries: 3
+
+volumes:
+  aria_logs:

@@ -1,0 +1,52 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# ARIA — monolithic deployment config example
+# Copy to conf.yaml in this directory and fill in your values.
+# This file is bind-mounted at /etc/aria/conf.yaml inside the container.
+# ──────────────────────────────────────────────────────────────────────────────
+
+runtime:
+  operating_mode: inform    # only 'inform' is implemented in Phase 1.5
+  vault_backend: env        # 'env' reads secrets from environment variables
+  log_format: json          # json is best for container log aggregators
+  log_dir: /var/log/aria    # matches the volume mount in docker-compose.yml
+
+runs:
+  db_path: /var/log/aria/runs.db  # store run history alongside logs
+
+servicenow:
+  instance: <your-instance>.service-now.com
+  user: <your-service-account>
+  assignment_group: <your-assignment-group>
+  cmdb_rel_type: "Members::Member of"
+
+llm:
+  provider: anthropic        # anthropic | claude_code | vertex_ai
+  mode: global
+  global_model: claude-sonnet-4-6
+  agents:
+    agent1: ""
+    agent2: ""               # leave empty to use static routing in Agent 2
+    agent3: ""
+    agent4: ""
+
+connectors:
+  log: gcp                  # gcp | memory (use memory only for dry-run/testing)
+  queue: memory
+  state_store: memory
+
+gcp:
+  project_id: <your-gcp-project-id>
+  region: europe-west1
+  gcs_bucket_logs: <your-gcs-bucket>
+  bq_log_dataset: <your-bq-dataset>
+
+cdp:
+  ssh_user: hadoop
+  log_dirs:
+    - /var/log/hadoop-hdfs
+    - /var/log/hadoop-yarn
+    - /var/log/hive
+    - /var/log/spark
+
+slack:
+  channel_id: <your-slack-channel-id>

@@ -52,3 +52,31 @@ jobs:
 
       - name: pytest (unit)
         run: pytest tests/unit/ -v
+
+  docker-smoke:
+    name: Docker build + smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t aria:ci .
+
+      - name: Smoke test
+        run: |
+          docker run -d --name aria-ci \
+            -e ARIA_DRY_RUN=true \
+            -e ARIA_LLM_PROVIDER=anthropic \
+            -e ANTHROPIC_API_KEY=dummy \
+            -p 8000:8000 aria:ci
+          # Wait for the API to boot (health check starts after start_period).
+          for i in $(seq 1 15); do
+            if curl -sf http://localhost:8000/api/v1/health; then
+              echo "Health check passed"
+              break
+            fi
+            echo "Waiting... ($i/15)"
+            sleep 2
+          done
+          curl -sf http://localhost:8000/api/v1/health
+          docker stop aria-ci

@@ -14,6 +14,12 @@ runtime:
   operating_mode: inform    # inform | hitm | autonomous — only 'inform' is implemented
                             # in Phase 1.5; the others raise NotImplementedError until
                             # their phase ships (hitm: Phase 2, autonomous: Phase 3)
+  vault_backend: env        # env | gcp | hashicorp | aws | azure
+                            # 'env' reads secrets from environment variables (local dev)
+                            # 'gcp' uses GCP Secret Manager via ADC (container deployments)
+  log_format: human         # human | json — human is coloured structlog for terminals;
+                            # json is machine-readable for log aggregators (Splunk, ELK)
+  log_dir: logs/            # directory for rolling log files (overridden by ARIA_LOG_DIR)
 
 runs:
   db_path: data/runs.db     # SQLite file for run history (monitoring API + dashboard)
@@ -25,6 +31,10 @@ servicenow:
   cmdb_rel_type: "Members::Member of"         # override if your instance uses a different type
 
 llm:
+  provider: anthropic       # anthropic | claude_code | vertex_ai
+                            # anthropic:   direct Anthropic API — needs ANTHROPIC_API_KEY
+                            # claude_code: local Claude Code CLI — local dev only (security risk in prod, #84)
+                            # vertex_ai:   GCP Vertex AI via ADC — use for container deployments
   mode: modular             # modular | global
   global_model: ""          # used only when mode=global, e.g. claude-sonnet-4-6
   agents:
