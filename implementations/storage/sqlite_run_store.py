@@ -43,36 +43,45 @@ CREATE TABLE IF NOT EXISTS runs (
 )
 """
 
+# Static query templates for list() and count(). Each optional filter uses the
+# "? IS NULL OR column op ?" pattern so the SQL string is a constant — user
+# input flows only into the parameter tuple, never into the query string itself.
+# Each filter value must appear twice: once for the IS NULL check, once for the
+# comparison. NULL IS NULL evaluates to TRUE in SQLite, so an unset filter is
+# a no-op without any dynamic WHERE clause construction.
+_LIST_SQL = (
+    "SELECT " + _COLUMNS + " FROM runs"
+    " WHERE (? IS NULL OR start_time >= ?)"
+    "   AND (? IS NULL OR start_time <= ?)"
+    "   AND (? IS NULL OR status = ?)"
+    "   AND (? IS NULL OR error_class = ?)"
+    " ORDER BY start_time DESC LIMIT ? OFFSET ?"
+)
 
-def _build_filters(
+_COUNT_SQL = (
+    "SELECT COUNT(*) FROM runs"
+    " WHERE (? IS NULL OR start_time >= ?)"
+    "   AND (? IS NULL OR start_time <= ?)"
+    "   AND (? IS NULL OR status = ?)"
+    "   AND (? IS NULL OR error_class = ?)"
+)
+
+
+def _filter_params(
     from_dt: datetime | None,
     to_dt: datetime | None,
     status: str | None,
     error_class: str | None,
-) -> tuple[str, list[str]]:
-    """Build the shared WHERE clause for list() and count().
+) -> tuple:
+    """Build the parameter tuple for _LIST_SQL / _COUNT_SQL.
 
-    Module-level (not a method) because the ``list`` method name on the store
-    class shadows the builtin in annotations. ISO-8601 strings compare
-    lexicographically in the same order as the datetimes they encode, so the
-    range filters are plain string compares.
+    ISO-8601 strings compare lexicographically in the same order as the
+    datetimes they represent, so range filters are plain string comparisons.
+    Each value appears twice to match the (? IS NULL OR column = ?) pattern.
     """
-    clauses: list[str] = []
-    params: list[str] = []
-    if from_dt is not None:
-        clauses.append("start_time >= ?")
-        params.append(from_dt.isoformat())
-    if to_dt is not None:
-        clauses.append("start_time <= ?")
-        params.append(to_dt.isoformat())
-    if status is not None:
-        clauses.append("status = ?")
-        params.append(status)
-    if error_class is not None:
-        clauses.append("error_class = ?")
-        params.append(error_class)
-    where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
-    return where, params
+    from_s = from_dt.isoformat() if from_dt is not None else None
+    to_s = to_dt.isoformat() if to_dt is not None else None
+    return (from_s, from_s, to_s, to_s, status, status, error_class, error_class)
 
 
 class SQLiteRunStore(RunStoreInterface):
@@ -125,10 +134,9 @@ class SQLiteRunStore(RunStoreInterface):
         offset: int = 0,
     ) -> list[RunRecord]:
         """Query records newest-first with optional time/status/error filters."""
-        where, params = _build_filters(from_dt, to_dt, status, error_class)
-        sql = f"SELECT {_COLUMNS} FROM runs{where} " "ORDER BY start_time DESC LIMIT ? OFFSET ?"
+        params = _filter_params(from_dt, to_dt, status, error_class)
         with self._connect() as conn:
-            rows = conn.execute(sql, (*params, limit, offset)).fetchall()
+            rows = conn.execute(_LIST_SQL, (*params, limit, offset)).fetchall()
         return [self._row_to_record(r) for r in rows]
 
     def count(
@@ -139,9 +147,9 @@ class SQLiteRunStore(RunStoreInterface):
         error_class: str | None = None,
     ) -> int:
         """Count records matching the same filters as list()."""
-        where, params = _build_filters(from_dt, to_dt, status, error_class)
+        params = _filter_params(from_dt, to_dt, status, error_class)
         with self._connect() as conn:
-            (n,) = conn.execute(f"SELECT COUNT(*) FROM runs{where}", params).fetchone()
+            (n,) = conn.execute(_COUNT_SQL, params).fetchone()
         return int(n)
 
     @staticmethod
