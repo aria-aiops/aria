@@ -141,6 +141,20 @@ def cdp_ssh_user() -> str:
     return _get(["cdp", "ssh_user"], "CDP_SSH_USER", "hadoop")
 
 
+def cdp_ssh_key_secret() -> str:
+    """Return the vault key name used to retrieve the CDP SSH private key.
+
+    For EnvVarVault: the key name is read directly from the environment.
+    For GCPSecretManagerVault: underscores are normalised to hyphens and an
+    'aria-' prefix is added — e.g. 'CDP_SSH_KEY' → GCP secret 'aria-cdp-ssh-key'.
+    The TF-provisioned secret name for UC1 is 'aria-uc1-ssh-private-key', which
+    requires setting cdp.ssh_key_secret: CDP_UC1_SSH_PRIVATE_KEY in conf.yaml
+    (resolves to 'aria-cdp-uc1-ssh-private-key') or renaming the TF secret.
+    Defaults to 'CDP_SSH_KEY' (backward-compatible with pre-S4 deployments).
+    """
+    return _get(["cdp", "ssh_key_secret"], "CDP_SSH_KEY_SECRET", "CDP_SSH_KEY")
+
+
 def cdp_log_dirs() -> list[str]:
     """Return directories to search for logs on CDP cluster nodes.
 
@@ -210,6 +224,19 @@ def run_db_path() -> str:
     Defaults to data/runs.db (project root, local dev).
     """
     return _get(["runs", "db_path"], "ARIA_RUN_DB_PATH", "data/runs.db")
+
+
+# ── Knowledge Base ────────────────────────────────────────────────────────────
+
+
+def analyser_kb_dir() -> str | None:
+    """Return path to the analyser_kb directory of labeled log excerpts for Agent 3 few-shot prompting.
+
+    Reads knowledge_base.analyser_kb_dir from conf.yaml / ARIA_ANALYSER_KB_DIR env var.
+    None when not configured — Agent 3 classifies without few-shot examples.
+    """
+    val = _get(["knowledge_base", "analyser_kb_dir"], "ARIA_ANALYSER_KB_DIR")
+    return val or None
 
 
 # ── GCP ───────────────────────────────────────────────────────────────────────

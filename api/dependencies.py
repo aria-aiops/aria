@@ -144,7 +144,10 @@ def get_agent3() -> ClassifierAgent:
             "ARIA_AGENT3_MODEL env var is not set "
             "(or ARIA_GLOBAL_MODEL when ARIA_LLM_MODE=global)"
         )
-    return ClassifierAgent(llm_client=_get_llm_client(model))
+    return ClassifierAgent(
+        llm_client=_get_llm_client(model),
+        analyser_kb_dir=cfg.analyser_kb_dir(),
+    )
 
 
 @lru_cache(maxsize=1)
@@ -240,12 +243,17 @@ def get_agent2() -> LogExtractorAgent:
     registry = {
         PlatformTag.CDP: SSHLogConnector(
             vault,
-            ssh_key_secret="CDP_SSH_KEY",
+            ssh_key_secret=cfg.cdp_ssh_key_secret(),
             ssh_user=cfg.cdp_ssh_user(),
             host_key_secret="CDP_HOST_KEY" if os.environ.get("CDP_HOST_KEY") else None,
             log_dirs=cfg.cdp_log_dirs(),
         ),
-        PlatformTag.GCP: GCPLogConnector(vault),
+        # resource_types scopes Cloud Logging queries to Dataproc cluster and job logs (UC2).
+        # S6 will generalise this into a configurable resource_type_templates dict.
+        PlatformTag.GCP: GCPLogConnector(
+            vault,
+            resource_types=["cloud_dataproc_cluster", "cloud_dataproc_job"],
+        ),
     }
     llm = None
     model = _resolve_model("2")
