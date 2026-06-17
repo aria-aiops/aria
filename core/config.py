@@ -226,6 +226,19 @@ def run_db_path() -> str:
     return _get(["runs", "db_path"], "ARIA_RUN_DB_PATH", "data/runs.db")
 
 
+# ── Knowledge Base ────────────────────────────────────────────────────────────
+
+
+def analyser_kb_dir() -> str | None:
+    """Return path to the analyser_kb directory of labeled log excerpts for Agent 3 few-shot prompting.
+
+    Reads knowledge_base.analyser_kb_dir from conf.yaml / ARIA_ANALYSER_KB_DIR env var.
+    None when not configured — Agent 3 classifies without few-shot examples.
+    """
+    val = _get(["knowledge_base", "analyser_kb_dir"], "ARIA_ANALYSER_KB_DIR")
+    return val or None
+
+
 # ── GCP ───────────────────────────────────────────────────────────────────────
 
 

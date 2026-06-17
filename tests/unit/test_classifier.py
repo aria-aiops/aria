@@ -307,3 +307,45 @@ def test_llm_retry_exhausted_raises_classification_error() -> None:
             agent.run(_make_state())
 
     assert llm.complete.call_count == 2
+
+
+# ── Few-shot injection (analyser_kb) ─────────────────────────────────────────
+
+
+def test_few_shot_examples_injected_in_message() -> None:
+    """analyser_kb examples appear in the user message when analyser_kb_dir is configured."""
+    import os
+
+    analyser_kb_dir = os.path.join(
+        os.path.dirname(__file__), "../fixtures/knowledge_base/analyser_kb"
+    )
+    agent = ClassifierAgent(
+        llm_client=_mock_llm(_oom_response()),
+        analyser_kb_dir=analyser_kb_dir,
+    )
+    messages = agent._build_messages(_make_state())
+    content = messages[0]["content"]
+
+    assert "Reference log examples" in content
+    assert "label: incident" in content
+
+
+def test_no_analyser_kb_dir_produces_clean_message() -> None:
+    """Without analyser_kb_dir, the user message contains no few-shot section."""
+    agent = ClassifierAgent(llm_client=_mock_llm(_oom_response()))
+    messages = agent._build_messages(_make_state())
+    content = messages[0]["content"]
+
+    assert "Reference log examples" not in content
+
+
+def test_missing_analyser_kb_dir_degrades_gracefully() -> None:
+    """A non-existent analyser_kb_dir is silently ignored — no crash, no examples."""
+    agent = ClassifierAgent(
+        llm_client=_mock_llm(_oom_response()),
+        analyser_kb_dir="/nonexistent/path/analyser_kb",
+    )
+    messages = agent._build_messages(_make_state())
+    content = messages[0]["content"]
+
+    assert "Reference log examples" not in content
