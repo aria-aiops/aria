@@ -9,7 +9,8 @@ terraform {
 }
 
 provider "azurerm" {
-  subscription_id = var.subscription_id
+  subscription_id             = var.subscription_id
+  skip_provider_registration  = true
   features {}
 }
 
@@ -150,7 +151,7 @@ resource "azurerm_linux_virtual_machine" "nodes" {
   name                = each.key
   location            = azurerm_resource_group.uc1.location
   resource_group_name = azurerm_resource_group.uc1.name
-  size                = "Standard_B2ms"   # 2 vCPU, 8 GB RAM — equivalent to GCP e2-standard-2
+  size                = "Standard_D2s_v3" # 2 vCPU, 8 GB RAM — B2ms capacity unavailable in westeurope
 
   admin_username = "aria"
   # SSH key auth only — no password
