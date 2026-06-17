@@ -1,0 +1,10 @@
+subscription_id     = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"   # az account show --query id
+resource_group_name = "aria-uc1-rg"
+location            = "West Europe"
+
+# Your workstation public IP — curl ifconfig.me
+allowed_ssh_cidr = "YOUR_IP/32"
+
+# Generate with: ssh-keygen -t ed25519 -f ~/.ssh/aria_uc1_key -C aria -N ""
+# Then: cat ~/.ssh/aria_uc1_key.pub
+aria_ssh_public_key = "ssh-ed25519 AAAA... aria"
