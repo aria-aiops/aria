@@ -172,8 +172,9 @@ Time window: `opened_at − 30 min`. On empty result, retries once with a 60-min
 **Implemented connectors:**
 - `SSHLogConnector` (`implementations/clusters/onprem/`) — provider-agnostic SSH connector for any on-premise cluster (CDP, HDP, Oracle RAC, MapR, etc.). Log dirs and SSH credentials are constructor params.
 - `GCPLogConnector` (`implementations/clusters/cloud/gcp/`) — Cloud Logging API with vault-backed service account.
+- `AzureLogConnector` (`implementations/clusters/cloud/azure/`) — Azure Monitor Log Analytics workspace, KQL-based queries, `DefaultAzureCredential` auth. Workspace ID resolved from vault at query time.
 
-**Cloud stubs:** Databricks, AWS EMR, Azure Monitor — raise `NotImplementedError`, full implementations planned.
+**Cloud stubs:** Databricks, AWS EMR — raise `NotImplementedError`, full implementations planned.
 
 ### Agent 3 — Classifier ✅ Implemented
 
@@ -484,9 +485,9 @@ aria/
 │   │   ├── onprem/            # SSHLogConnector — any bare-metal/VM cluster (CDP, HDP, Oracle RAC, MapR, etc.)
 │   │   └── cloud/
 │   │       ├── gcp/           # GCPLogConnector — Cloud Logging API
+│   │       ├── azure/         # ✅ AzureLogConnector — Log Analytics workspace (Azure Monitor)
 │   │       ├── databricks/    # stub — planned
-│   │       ├── aws/           # stub — planned
-│   │       └── azure/         # stub — planned
+│   │       └── aws/           # stub — planned
 │   ├── itsm/
 │   │   └── servicenow/        # ServiceNowConnector
 │   ├── coms/
@@ -508,7 +509,9 @@ aria/
 ├── documentation/             # MkDocs site source (mkdocs serve)
 ├── infra/
 │   └── terraform/
-│       └── uc_testing/        # UC1 (Hadoop VMs) · UC2 (Dataproc) · UC3 (GCP native)
+│       └── uc_testing/
+│           ├── gcp/           # UC1 (Hadoop VMs) · UC2 (Dataproc) · UC3 (GCP native)
+│           └── azure/         # UC1 (Hadoop VMs) · UC2 (HDInsight) · UC3 (Azure native)
 ├── ml/                        # Datasets, few-shot prompt assets, evaluation scripts
 ├── tests/acceptance/          # ground_truth.json · round results · AC reports
 ├── Dockerfile                 # P1.5 S3 — python:3.11-slim, non-root, single stage
@@ -627,7 +630,7 @@ Phase 1 is complete when all of the following pass on 10 consecutive test incide
 | Phase 1.5 | S1: Structured logging — structlog, `run_id`, lifecycle events, RunRecord | ✅ Done |
 | Phase 1.5 | S2: Monitoring foundation — run store, REST API, Alpine.js dashboard, mode scaffold | ✅ Done |
 | Phase 1.5 | S3: Docker + `ARIA_CONFIG_PATH` + `VertexAILLMClient` + LLM provider DI (incl. #84 security fix) | ✅ Done |
-| Phase 1.5 | S4: Testing infrastructure — UC1/UC2/UC3 cluster wiring, KB runbooks, CMDB validation | 🔄 In progress |
+| Phase 1.5 | S4: Testing infrastructure — UC1/UC2/UC3 cluster wiring (GCP + Azure), KB runbooks, AzureLogConnector wired | 🔄 In progress |
 | Phase 1.5 | S5: Round 2 acceptance testing — 30 incidents on UC1 + UC2 real infrastructure | 🔜 Planned |
 | Phase 1.5 | S6: GCP native connectors — BQ, Cloud Functions, Pub/Sub, GCS | 🔜 Planned |
 | Phase 2 | Human validation gate + write-back to ServiceNow | 💡 Planned |
