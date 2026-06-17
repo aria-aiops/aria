@@ -1,0 +1,11 @@
+subscription_id      = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"   # az account show --query id
+resource_group_name  = "aria-uc3-rg"
+location             = "West Europe"
+storage_account_name = "ariauc3native"   # must be globally unique — add a suffix if taken
+
+# Full ARM resource ID from UC2 output:
+# cd ../uc2-hdinsight && terraform output log_analytics_workspace_resource_id
+log_analytics_workspace_resource_id = "/subscriptions/xxxx.../resourceGroups/aria-uc2-rg/providers/Microsoft.OperationalInsights/workspaces/aria-logs-workspace"
+
+# 8+ chars, mixed case + digit + special char
+synapse_sql_password = "REPLACE_ME_Str0ng!"

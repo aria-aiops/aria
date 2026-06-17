@@ -1,0 +1,13 @@
+subscription_id      = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"   # az account show --query id
+resource_group_name  = "aria-uc2-rg"
+location             = "West Europe"
+storage_account_name = "ariauc2logs"   # must be globally unique — add a suffix if taken
+
+# az ad signed-in-user show --query id -o tsv
+aria_runner_object_id = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+
+# Reuse the UC1 key or generate a new one
+aria_ssh_public_key = "ssh-ed25519 AAAA... aria"
+
+# Minimum 10 chars, mixed case + digit + special char required by HDInsight
+hdinsight_gateway_password = "REPLACE_ME_Str0ng!"
