@@ -144,7 +144,10 @@ def get_agent3() -> ClassifierAgent:
             "ARIA_AGENT3_MODEL env var is not set "
             "(or ARIA_GLOBAL_MODEL when ARIA_LLM_MODE=global)"
         )
-    return ClassifierAgent(llm_client=_get_llm_client(model))
+    return ClassifierAgent(
+        llm_client=_get_llm_client(model),
+        analyser_kb_dir=cfg.analyser_kb_dir(),
+    )
 
 
 @lru_cache(maxsize=1)

@@ -75,5 +75,10 @@ cdp:
     - /var/log/oozie
     - /var/log/nifi
 
+knowledge_base:
+  analyser_kb_dir: data/knowledge_base/analyser_kb  # labeled log excerpts for Agent 3 few-shot prompting
+                                                     # doubles as fine-tuning corpus for the future
+                                                     # specialist Agent 3 model (roadmap: post-POC)
+
 slack:
   channel_id: <your-slack-channel-id>   # channel where Agent 4 posts notifications
