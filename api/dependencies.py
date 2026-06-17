@@ -21,6 +21,7 @@ from core.interfaces.run_store import RunStoreInterface
 from core.interfaces.vault import VaultInterface
 from core.models import PlatformTag
 from core.orchestrator.pipeline import ARIAPipeline
+from implementations.clusters.cloud.azure.log_connector import AzureLogConnector
 from implementations.clusters.cloud.gcp.log_connector import GCPLogConnector
 from implementations.clusters.onprem.log_connector import SSHLogConnector
 from implementations.itsm.servicenow.connector import ServiceNowConnector
@@ -75,7 +76,11 @@ def _get_vault() -> VaultInterface:
         from implementations.vault.gcp_secret_manager import GCPSecretManagerVault
 
         return GCPSecretManagerVault.from_env()
-    # hashicorp, aws, azure already have implementations — wire them here as they get used.
+    if backend == "azure":
+        from implementations.vault.azure_kv import AzureKeyVaultClient
+
+        return AzureKeyVaultClient.from_env()
+    # hashicorp, aws — implementations exist, wire when needed.
     return EnvVarVault()
 
 
@@ -231,9 +236,9 @@ def get_pipeline() -> "ARIAPipeline":
 def get_agent2() -> LogExtractorAgent:
     """Build and cache the Agent 2 (Log Extractor) instance.
 
-    Registers CDP (SSH) and GCP (Cloud Logging) connectors. Missing credentials
-    are non-fatal at construction — connectors resolve secrets at query time
-    and return empty results gracefully if credentials are absent.
+    Registers CDP (SSH), GCP (Cloud Logging), and Azure (Log Analytics) connectors.
+    Missing credentials are non-fatal at construction — connectors resolve secrets
+    at query time and return empty results gracefully if credentials are absent.
     Injects an LLM client for query planning if ARIA_AGENT2_MODEL is set.
     """
     vault = _get_vault()
@@ -253,6 +258,12 @@ def get_agent2() -> LogExtractorAgent:
         PlatformTag.GCP: GCPLogConnector(
             vault,
             resource_types=["cloud_dataproc_cluster", "cloud_dataproc_job"],
+        ),
+        # Azure Log Analytics workspace — workspace ID resolved from AZURE_LOG_WORKSPACE_ID
+        # secret at query time. Covers UC2 (HDInsight) and UC3 (Azure-native) incidents.
+        PlatformTag.AZURE: AzureLogConnector(
+            vault,
+            workspace_id_secret="AZURE_LOG_WORKSPACE_ID",
         ),
     }
     llm = None
