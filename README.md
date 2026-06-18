@@ -612,6 +612,30 @@ Phase 1 is complete when all of the following pass on 10 consecutive test incide
 
 ---
 
+## S4 Smoke Test Results (2026-06-17)
+
+First live end-to-end validation against real (non-local) infrastructure. Agent 1 was stubbed;
+Agents 2 → 3 → 4 ran live against Azure VMs.
+
+| Use Case | Platform | Status | Notes |
+|---|---|---|---|
+| UC1 — Hadoop on-prem (CDP) | Azure VM (`Standard_D2s_v3`, West Europe) | ✅ **PASS** | 1 log line retrieved, `disk/HIGH` (0.93), Slack notified |
+| UC2 — Managed Spark | — | ⏳ Deferred | GCP billing blocked; Azure HDInsight not yet deployed |
+| UC3 — GCP native | — | ⏳ Deferred | Same blocker as UC2 |
+
+**UC1 result:**
+```
+log_lines:         1        (DISK_FAILURE WARN on /var/log/hadoop/hdfs/)
+root_cause:        disk
+confidence:        HIGH (0.93)
+notification_sent: True
+```
+
+Full report: [documentation/reports/s4_uc1_smoke_test_2026-06-17.md](documentation/reports/s4_uc1_smoke_test_2026-06-17.md)
+Test script: [scripts/smoke_uc1.py](scripts/smoke_uc1.py)
+
+---
+
 ## Roadmap
 
 | Phase | Milestone | Status |
@@ -630,7 +654,7 @@ Phase 1 is complete when all of the following pass on 10 consecutive test incide
 | Phase 1.5 | S1: Structured logging — structlog, `run_id`, lifecycle events, RunRecord | ✅ Done |
 | Phase 1.5 | S2: Monitoring foundation — run store, REST API, Alpine.js dashboard, mode scaffold | ✅ Done |
 | Phase 1.5 | S3: Docker + `ARIA_CONFIG_PATH` + `VertexAILLMClient` + LLM provider DI (incl. #84 security fix) | ✅ Done |
-| Phase 1.5 | S4: Testing infrastructure — UC1/UC2/UC3 cluster wiring (GCP + Azure), KB runbooks, AzureLogConnector wired | 🔄 In progress |
+| Phase 1.5 | S4: Testing infrastructure — UC1/UC2/UC3 cluster wiring (GCP + Azure), KB runbooks, AzureLogConnector wired | ✅ Done (UC1 smoke PASS; UC2/UC3 deferred) |
 | Phase 1.5 | S5: Round 2 acceptance testing — 30 incidents on UC1 + UC2 real infrastructure | 🔜 Planned |
 | Phase 1.5 | S6: GCP native connectors — BQ, Cloud Functions, Pub/Sub, GCS | 🔜 Planned |
 | Phase 2 | Human validation gate + write-back to ServiceNow | 💡 Planned |
